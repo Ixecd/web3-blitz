@@ -65,3 +65,8 @@ memory
 - UTXO pruned storage ~10GB global.
 - Fresh key anti pre-mine DS.
 
+```zsh
+brew install go@1.22 bitcoind geth jq
+export PATH="/opt/homebrew/opt/go@1.22/bin:$PATH"
+go get github.com/btcsuite/btcd/rpcclient@latest github.com/ethereum/go-ethereum/ethclient@latest
+```

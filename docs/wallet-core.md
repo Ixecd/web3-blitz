@@ -87,3 +87,8 @@ m|Master Key（主密钥）|起点，就是你备份的那个种子（Seed / 助
 user1|m/44'/0'/0'/0/0|第1个充值地址
 user2|m/44'/0'/0'/0/1|第2个充值地址
 user999|m/44'/0'/0'/0/999|第1000个充值地址
+
+我们彻底甩掉了那个「老古董依赖」 —— `github.com/btcsuite/btcutil/hdkeychain`
+这个老包内部死扣了一个**超级老的 btcec 路径**（`github.com/btcsuite/btcd/btcec`），无论我们怎么 replace、怎么换版本，它都会偷偷拉旧版，导致 `unknown revision` 报错。
+
+我们最后换成了 `github.com/tyler-smith/go-bip32` 这个现代干净库，它不带那些历史包袱，直接用新版 `btcec/v2`，所以整个模块图瞬间干净了。

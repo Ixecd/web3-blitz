@@ -1,19 +1,15 @@
 package core
 
-import (
-	"github.com/btcsuite/btcd/btcutil/hdkeychain"
-	"github.com/btcsuite/btcd/chaincfg"   // ← 必须加这个
-)
+import "github.com/tyler-smith/go-bip32"
 
 type HDWallet struct {
-	masterKey *hdkeychain.ExtendedKey
+	MasterKey *bip32.Key   // 大写 M，已导出
 }
 
 func NewHDWallet(seed []byte) (*HDWallet, error) {
-	// 使用 chaincfg.MainNetParams（regtest 也可以用这个）
-	master, err := hdkeychain.NewMaster(seed, &chaincfg.MainNetParams)
+	master, err := bip32.NewMasterKey(seed)
 	if err != nil {
 		return nil, err
 	}
-	return &HDWallet{masterKey: master}, nil
+	return &HDWallet{MasterKey: master}, nil
 }

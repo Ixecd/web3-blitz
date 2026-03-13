@@ -1,0 +1,20 @@
+# Wallet Core 配置（纯配置，不放业务逻辑）
+wallet:
+  service:
+    name: wallet-service
+    port: 2113
+    env: dev                     # dev / test / prod
+
+  # HD 钱包相关（敏感信息建议后续改成 secrets 管理）
+  hd:
+    seed_file: "configs/secrets/hd-seed.enc"   # 推荐加密存放
+
+  # Prometheus 监控
+  metrics:
+    enabled: true
+    port: 2113
+
+  # 日志
+  log:
+    level: info
+    format: json

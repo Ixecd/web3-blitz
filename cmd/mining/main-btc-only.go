@@ -29,7 +29,7 @@ func main() {
 	prometheus.MustRegister(blocksMined, balanceGauge)
 
 	cfg := &rpcclient.ConnConfig{
-		Host:         "localhost:18443/wallet/miner",
+		Host:         "localhost:18443/wallet/blitz_wallet",
 		User:         "user",
 		Pass:         "pass",
 		HTTPPostMode: true,

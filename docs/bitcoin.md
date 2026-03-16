@@ -88,3 +88,23 @@ go get github.com/btcsuite/btcd/rpcclient@latest github.com/ethereum/go-ethereum
 日本是唯一被核弹炸过的国家，是战后从废墟里重建起来的，是一个极度压缩了「文明可以在一瞬间消失」这件事的民族记忆。所以他们对「遗留」、「传承」、「人类在时间长河里留下什么」这类命题，有一种别的文化没有的切肤之感。
 
 中本聪这个名字是不是真的日本人我们不知道，但他选择消失这件事本身——把作品留下，把自己抹去——倒真的很符合某种东方美学。
+
+bitcoin-cli -regtest getdescriptorinfo "addr(bcrt1q你的真实地址)"
+```
+
+它会返回一个带checksum的`descriptor`字段，然后用那个去importdescriptors。
+
+---
+
+但我说真的，这条路越走越麻烦。
+
+你现在卡在checksum，搞定checksum之后还有Go代码里怎么自动计算checksum的问题——btcd没有封装这个，你得自己实现descriptor checksum算法，不复杂但很烦。
+
+**我建议现在就切到扫块方案。**
+
+你不需要importdescriptors，不需要checksum，不需要依赖Bitcoin Core的钱包功能。
+
+思路很简单：
+```
+生成地址 → 存到你自己的数据库(address -> userID)
+Deposit Watcher → 订阅新块 → 遍历交易outputs → 匹配数据库里的地址 → 入账

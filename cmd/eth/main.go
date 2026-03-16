@@ -28,7 +28,7 @@ func main() {
 
 	// BTC
 	btcCfg := &rpcclient.ConnConfig{
-		Host:         "localhost:18443/wallet/miner",
+		Host:         "localhost:18443/wallet/blitz_wallet",
 		User:         "user",
 		Pass:         "pass",
 		HTTPPostMode: true,

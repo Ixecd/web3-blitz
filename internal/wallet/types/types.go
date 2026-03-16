@@ -21,3 +21,14 @@ type BalanceResponse struct {
 	Balance float64 `json:"balance"`
 	Chain   Chain   `json:"chain"`
 }
+
+// DepositRecord 充值记录
+type DepositRecord struct {
+	TxID      string  `json:"tx_id"`
+	Address   string  `json:"address"`
+	UserID    string  `json:"user_id"`
+	Amount    float64 `json:"amount"`
+	Height    int64   `json:"height"`
+	Confirmed bool    `json:"confirmed"`
+	Chain     Chain   `json:"chain"`
+}

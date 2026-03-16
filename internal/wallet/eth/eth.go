@@ -3,18 +3,22 @@ package eth
 import (
 	"context"
 	"fmt"
+	"math/big"
 
 	"github.com/Ixecd/web3-blitz/internal/wallet/core"
 	"github.com/Ixecd/web3-blitz/internal/wallet/types"
+	"github.com/ethereum/go-ethereum/common"
 	"github.com/ethereum/go-ethereum/crypto"
+	"github.com/ethereum/go-ethereum/ethclient"
 )
 
 type ETHWallet struct {
 	hdWallet *core.HDWallet
+	rpc      *ethclient.Client   // 新增：真实 Geth 客户端
 }
 
-func NewETHWallet(hd *core.HDWallet) *ETHWallet {
-	return &ETHWallet{hdWallet: hd}
+func NewETHWallet(hd *core.HDWallet, rpc *ethclient.Client) *ETHWallet {
+	return &ETHWallet{hdWallet: hd, rpc: rpc}
 }
 
 // GenerateDepositAddress 生成真实 ETH 充值地址（BIP44）
@@ -49,12 +53,22 @@ func (w *ETHWallet) GenerateDepositAddress(ctx context.Context, userID string, c
 	}, nil
 }
 
-// GetBalance 查询余额（后面接真实 RPC）
+// GetBalance 真实查询 ETH 余额
 func (w *ETHWallet) GetBalance(ctx context.Context, address string, chain types.Chain) (types.BalanceResponse, error) {
-	// TODO: 后面接真实 RPC
+	addr := common.HexToAddress(address)
+	bal, err := w.rpc.BalanceAt(ctx, addr, nil)
+	if err != nil {
+		return types.BalanceResponse{}, err
+	}
+
+	// wei 转 ETH
+	ethBalance := new(big.Float).Quo(new(big.Float).SetInt(bal), new(big.Float).SetInt64(1e18))
+
+	f, _ := ethBalance.Float64()
+
 	return types.BalanceResponse{
 		Address: address,
-		Balance: 0.0,
+		Balance: f,
 		Chain:   chain,
 	}, nil
 }

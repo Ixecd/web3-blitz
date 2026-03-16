@@ -1,0 +1,41 @@
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: wallet-service
+  labels:
+    app: wallet-service
+    {{- include "web3-blitz.labels" . | nindent 4 }}
+spec:
+  replicas: {{ .Values.walletService.replicaCount | default 1 }}
+  selector:
+    matchLabels:
+      app: wallet-service
+  template:
+    metadata:
+      labels:
+        app: wallet-service
+    spec:
+      containers:
+        - name: wallet-service
+          image: "{{ .Values.walletService.image.repository }}:{{ .Values.walletService.image.tag | default .Chart.AppVersion }}"
+          imagePullPolicy: {{ .Values.walletService.image.pullPolicy | default "IfNotPresent" }}
+          ports:
+            - name: http
+              containerPort: 2113
+              protocol: TCP
+          env:
+            {{- with .Values.walletService.env }}
+            {{- toYaml . | nindent 12 }}
+            {{- end }}
+          livenessProbe:
+            httpGet:
+              path: /metrics
+              port: 2113
+            initialDelaySeconds: 10
+            periodSeconds: 10
+          readinessProbe:
+            httpGet:
+              path: /metrics
+              port: 2113
+            initialDelaySeconds: 5
+            periodSeconds: 5

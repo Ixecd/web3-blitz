@@ -126,12 +126,12 @@ resources: {}
 # This is to setup the liveness and readiness probes more information can be found here: https://kubernetes.io/docs/tasks/configure-pod-container/configure-liveness-readiness-startup-probes/
 livenessProbe:
   httpGet:
-    path: /
-    port: http
+    path: /healthz
+    port: 2113
 readinessProbe:
   httpGet:
-    path: /
-    port: http
+    path: /healthz
+    port: 2113
 
 # This section is for setting up autoscaling more information can be found here: https://kubernetes.io/docs/concepts/workloads/autoscaling/
 autoscaling:
@@ -159,3 +159,21 @@ nodeSelector: {}
 tolerations: []
 
 affinity: {}
+
+env:
+  - name: BTC_RPC_HOST
+    value: "bitcoind:18443/wallet/blitz_wallet"
+  - name: ETH_RPC_HOST
+    value: "http://geth:8545"
+
+walletService:
+  replicaCount: 1
+  image:
+    repository: qingchun22/wallet-service-arm64
+    pullPolicy: IfNotPresent
+    tag: "v0.1.0"
+  env:
+    - name: BTC_RPC_HOST
+      value: "localhost:18443/wallet/blitz_wallet"
+    - name: ETH_RPC_HOST
+      value: "http://localhost:8545"

@@ -62,9 +62,19 @@ func main() {
 		log.Printf("✅ 从DB恢复了 %d 个充值地址", len(addrs))
 	}
 
+	btcRPCHost := os.Getenv("BTC_RPC_HOST")
+	if btcRPCHost == "" {
+		btcRPCHost = "localhost:18443/wallet/blitz_wallet"
+	}
+
+	ethRPCHost := os.Getenv("ETH_RPC_HOST")
+	if ethRPCHost == "" {
+		ethRPCHost = "http://localhost:8545"
+	}
+
 	// 创建真实 RPC 客户端，外部连接
 	btcCfg := &rpcclient.ConnConfig{
-		Host:         "localhost:18443/wallet/blitz_wallet",
+		Host:         btcRPCHost,
 		User:         "user",
 		Pass:         "pass",
 		HTTPPostMode: true,
@@ -72,7 +82,7 @@ func main() {
 	}
 
 	btcRPC, _ := rpcclient.New(btcCfg, nil)
-	ethRPC, _ := ethclient.Dial("http://localhost:8545")
+	ethRPC, _ := ethclient.Dial(ethRPCHost)
 
 	// 业务组件
 	btcWallet := btc.NewBTCWallet(hdWallet, btcRPC, registry, queries)

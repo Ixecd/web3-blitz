@@ -1,10 +1,7 @@
 components:
-  - name: web3-blitz
-    port: 8080
-    image: web3-blitz
-
-  - name: wallet-service          # 新增
+  # - name: web3-blitz
+  #   port: 8080
+  #   image: web3-blitz
+  - name: wallet-service
     port: 2113
     image: wallet-service
-    depends_on:
-      - web3-blitz

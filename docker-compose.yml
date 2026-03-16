@@ -10,7 +10,7 @@ services:
     volumes:
       - bitcoind-data:/home/bitcoin/.bitcoin
     healthcheck:
-      test: ["CMD", "bitcoin-cli", "-regtest", "-rpcuser=user", "-rpcpassword=pass", "getblockchaininfo"]
+      test: [ "CMD", "bitcoin-cli", "-regtest", "-rpcuser=user", "-rpcpassword=pass", "getblockchaininfo" ]
       interval: 10s
       timeout: 5s
       retries: 5
@@ -50,3 +50,9 @@ services:
 volumes:
   bitcoind-data:
   wallet-data:
+
+
+environment:
+  - WALLET_HD_SEED=${WALLET_HD_SEED}
+  - BTC_RPC_HOST=bitcoind:18443/wallet/blitz_wallet
+  - ETH_RPC_HOST=http://geth:8545

@@ -22,3 +22,24 @@ SELECT * FROM deposit_addresses WHERE user_id = ? ORDER BY created_at ASC;
 
 -- name: ListAllDepositAddresses :many
 SELECT * FROM deposit_addresses ORDER BY created_at ASC;
+
+-- name: ListDepositsByUserID :many
+SELECT * FROM deposits WHERE user_id = ? ORDER BY created_at DESC;
+
+-- name: GetTotalDepositByUserIDAndChain :one
+SELECT COALESCE(SUM(amount), 0) as total
+FROM deposits 
+WHERE user_id = ? AND chain = ? AND confirmed = 1;
+
+-- name: ListDepositsByChain :many
+SELECT * FROM deposits WHERE chain = ? ORDER BY created_at DESC;
+
+-- name: GetTotalDepositByChain :one
+SELECT COALESCE(SUM(amount), 0) as total
+FROM deposits
+WHERE chain = ? AND confirmed = 1;
+
+-- name: GetAllChainsTotalDeposit :one
+SELECT COALESCE(SUM(amount), 0) as total
+FROM deposits
+WHERE confirmed = 1;

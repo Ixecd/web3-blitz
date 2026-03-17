@@ -12,9 +12,14 @@ type Querier interface {
 	CreateDeposit(ctx context.Context, arg CreateDepositParams) error
 	CreateDepositAddress(ctx context.Context, arg CreateDepositAddressParams) error
 	GetAddressByAddress(ctx context.Context, address string) (DepositAddress, error)
+	GetAllChainsTotalDeposit(ctx context.Context) (interface{}, error)
 	GetDepositByTxID(ctx context.Context, txID string) (Deposit, error)
+	GetTotalDepositByChain(ctx context.Context, chain string) (interface{}, error)
+	GetTotalDepositByUserIDAndChain(ctx context.Context, arg GetTotalDepositByUserIDAndChainParams) (interface{}, error)
 	ListAddressesByUserID(ctx context.Context, userID string) ([]DepositAddress, error)
 	ListAllDepositAddresses(ctx context.Context) ([]DepositAddress, error)
+	ListDepositsByChain(ctx context.Context, chain string) ([]Deposit, error)
+	ListDepositsByUserID(ctx context.Context, userID string) ([]Deposit, error)
 	ListUnconfirmedDeposits(ctx context.Context) ([]Deposit, error)
 }
 

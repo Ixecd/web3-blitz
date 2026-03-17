@@ -77,6 +77,19 @@ func (q *Queries) GetAddressByAddress(ctx context.Context, address string) (Depo
 	return i, err
 }
 
+const getAllChainsTotalDeposit = `-- name: GetAllChainsTotalDeposit :one
+SELECT COALESCE(SUM(amount), 0) as total
+FROM deposits
+WHERE confirmed = 1
+`
+
+func (q *Queries) GetAllChainsTotalDeposit(ctx context.Context) (interface{}, error) {
+	row := q.db.QueryRowContext(ctx, getAllChainsTotalDeposit)
+	var total interface{}
+	err := row.Scan(&total)
+	return total, err
+}
+
 const getDepositByTxID = `-- name: GetDepositByTxID :one
 SELECT id, tx_id, address, user_id, amount, height, confirmed, chain, created_at, updated_at FROM deposits WHERE tx_id = ? LIMIT 1
 `
@@ -97,6 +110,37 @@ func (q *Queries) GetDepositByTxID(ctx context.Context, txID string) (Deposit, e
 		&i.UpdatedAt,
 	)
 	return i, err
+}
+
+const getTotalDepositByChain = `-- name: GetTotalDepositByChain :one
+SELECT COALESCE(SUM(amount), 0) as total
+FROM deposits
+WHERE chain = ? AND confirmed = 1
+`
+
+func (q *Queries) GetTotalDepositByChain(ctx context.Context, chain string) (interface{}, error) {
+	row := q.db.QueryRowContext(ctx, getTotalDepositByChain, chain)
+	var total interface{}
+	err := row.Scan(&total)
+	return total, err
+}
+
+const getTotalDepositByUserIDAndChain = `-- name: GetTotalDepositByUserIDAndChain :one
+SELECT COALESCE(SUM(amount), 0) as total
+FROM deposits 
+WHERE user_id = ? AND chain = ? AND confirmed = 1
+`
+
+type GetTotalDepositByUserIDAndChainParams struct {
+	UserID string `db:"user_id" json:"user_id"`
+	Chain  string `db:"chain" json:"chain"`
+}
+
+func (q *Queries) GetTotalDepositByUserIDAndChain(ctx context.Context, arg GetTotalDepositByUserIDAndChainParams) (interface{}, error) {
+	row := q.db.QueryRowContext(ctx, getTotalDepositByUserIDAndChain, arg.UserID, arg.Chain)
+	var total interface{}
+	err := row.Scan(&total)
+	return total, err
 }
 
 const listAddressesByUserID = `-- name: ListAddressesByUserID :many
@@ -153,6 +197,82 @@ func (q *Queries) ListAllDepositAddresses(ctx context.Context) ([]DepositAddress
 			&i.Chain,
 			&i.Path,
 			&i.CreatedAt,
+		); err != nil {
+			return nil, err
+		}
+		items = append(items, i)
+	}
+	if err := rows.Close(); err != nil {
+		return nil, err
+	}
+	if err := rows.Err(); err != nil {
+		return nil, err
+	}
+	return items, nil
+}
+
+const listDepositsByChain = `-- name: ListDepositsByChain :many
+SELECT id, tx_id, address, user_id, amount, height, confirmed, chain, created_at, updated_at FROM deposits WHERE chain = ? ORDER BY created_at DESC
+`
+
+func (q *Queries) ListDepositsByChain(ctx context.Context, chain string) ([]Deposit, error) {
+	rows, err := q.db.QueryContext(ctx, listDepositsByChain, chain)
+	if err != nil {
+		return nil, err
+	}
+	defer rows.Close()
+	var items []Deposit
+	for rows.Next() {
+		var i Deposit
+		if err := rows.Scan(
+			&i.ID,
+			&i.TxID,
+			&i.Address,
+			&i.UserID,
+			&i.Amount,
+			&i.Height,
+			&i.Confirmed,
+			&i.Chain,
+			&i.CreatedAt,
+			&i.UpdatedAt,
+		); err != nil {
+			return nil, err
+		}
+		items = append(items, i)
+	}
+	if err := rows.Close(); err != nil {
+		return nil, err
+	}
+	if err := rows.Err(); err != nil {
+		return nil, err
+	}
+	return items, nil
+}
+
+const listDepositsByUserID = `-- name: ListDepositsByUserID :many
+SELECT id, tx_id, address, user_id, amount, height, confirmed, chain, created_at, updated_at FROM deposits WHERE user_id = ? ORDER BY created_at DESC
+`
+
+func (q *Queries) ListDepositsByUserID(ctx context.Context, userID string) ([]Deposit, error) {
+	rows, err := q.db.QueryContext(ctx, listDepositsByUserID, userID)
+	if err != nil {
+		return nil, err
+	}
+	defer rows.Close()
+	var items []Deposit
+	for rows.Next() {
+		var i Deposit
+		if err := rows.Scan(
+			&i.ID,
+			&i.TxID,
+			&i.Address,
+			&i.UserID,
+			&i.Amount,
+			&i.Height,
+			&i.Confirmed,
+			&i.Chain,
+			&i.CreatedAt,
+			&i.UpdatedAt,
 		); err != nil {
 			return nil, err
 		}

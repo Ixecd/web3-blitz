@@ -1,0 +1,38 @@
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: bitcoind
+  labels:
+    app: bitcoind
+spec:
+  replicas: 1
+  selector:
+    matchLabels:
+      app: bitcoind
+  template:
+    metadata:
+      labels:
+        app: bitcoind
+    spec:
+      containers:
+        - name: bitcoind
+          image: qingchun22/bitcoind-regtest:latest
+          ports:
+            - containerPort: 18443
+          volumeMounts:
+            - name: bitcoin-data
+              mountPath: /home/bitcoin/.bitcoin
+      volumes:
+        - name: bitcoin-data
+          emptyDir: {}
+---
+apiVersion: v1
+kind: Service
+metadata:
+  name: bitcoind
+spec:
+  selector:
+    app: bitcoind
+  ports:
+    - port: 18443
+      targetPort: 18443

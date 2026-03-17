@@ -1,0 +1,40 @@
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: geth-rpc
+  labels:
+    app: geth
+spec:
+  replicas: 1
+  selector:
+    matchLabels:
+      app: geth
+  template:
+    metadata:
+      labels:
+        app: geth
+    spec:
+      enableServiceLinks: false
+      containers:
+        - name: geth
+          image: ethereum/client-go:latest
+          args:
+            - --dev
+            - --http
+            - --http.addr=0.0.0.0
+            - --http.port=8545
+            - --http.api=eth,net,web3,personal,miner
+            - --dev.period=5
+          ports:
+            - containerPort: 8545
+---
+apiVersion: v1
+kind: Service
+metadata:
+  name: geth
+spec:
+  selector:
+    app: geth
+  ports:
+    - port: 8545
+      targetPort: 8545

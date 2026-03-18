@@ -1,6 +1,7 @@
 package api
 
 import (
+	"context"
 	"database/sql"
 	"encoding/json"
 	"fmt"
@@ -8,6 +9,7 @@ import (
 	"net/http"
 
 	"github.com/Ixecd/web3-blitz/internal/db"
+	"github.com/Ixecd/web3-blitz/internal/lock"
 	"github.com/Ixecd/web3-blitz/internal/wallet/btc"
 	"github.com/Ixecd/web3-blitz/internal/wallet/eth"
 	"github.com/Ixecd/web3-blitz/internal/wallet/types"
@@ -17,13 +19,17 @@ type Handler struct {
 	btcWallet *btc.BTCWallet
 	ethWallet *eth.ETHWallet
 	queries   *db.Queries
+	// redis     *redis.Client
+	locker *lock.DistributedLock
 }
 
-func NewHandler(btcWallet *btc.BTCWallet, ethWallet *eth.ETHWallet, queries *db.Queries) *Handler {
+func NewHandler(btcWallet *btc.BTCWallet, ethWallet *eth.ETHWallet, queries *db.Queries, locker *lock.DistributedLock) *Handler {
 	return &Handler{
 		btcWallet: btcWallet,
 		ethWallet: ethWallet,
 		queries:   queries,
+		// redis:     redis,
+		locker: locker,
 	}
 }
 
@@ -182,6 +188,26 @@ func (h *Handler) Withdraw(w http.ResponseWriter, r *http.Request) {
 	}
 
 	ctx := r.Context()
+
+	// 分布式锁，防止同一用户同一链并发提币
+	// lockKey := fmt.Sprintf("withdraw:lock:%s:%s", req.UserID, req.Chain)
+	// locked, err := h.redis.SetNX(ctx, lockKey, 1, 30*time.Second).Result()
+	// if err != nil {
+	// 	http.Error(w, "获取锁失败: "+err.Error(), http.StatusInternalServerError)
+	// 	return
+	// }
+	// if !locked {
+	// 	http.Error(w, "请勿重复提交，上一笔提币正在处理中", http.StatusTooManyRequests)
+	// 	return
+	// }
+	// defer h.redis.Del(ctx, lockKey)
+	lockKey := fmt.Sprintf("withdraw:%s:%s", req.UserID, req.Chain)
+	l, err := h.locker.Acquire(ctx, lockKey)
+	if err != nil {
+		http.Error(w, "请勿重复提交: "+err.Error(), http.StatusTooManyRequests)
+		return
+	}
+	defer l.Release(context.Background())
 
 	// 已确认充值
 	rawDeposit, err := h.queries.GetTotalDepositByUserIDAndChain(ctx, db.GetTotalDepositByUserIDAndChainParams{

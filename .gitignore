@@ -11,3 +11,7 @@
 .env
 *.enc
 secrets/
+
+*.db
+infra1.etcd/
+.etcd/

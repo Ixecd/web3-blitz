@@ -47,6 +47,39 @@ services:
       timeout: 3s
       retries: 5
 
+  etcd:
+    image: bitnami/etcd:latest
+    container_name: etcd
+    restart: always
+    command:
+      - ALLOW_NONE_AUTHENTICATION=yes
+      - ETCD_NAME=etcd1
+      - ETCD_LISTEN_CLIENT_URLS=http://0.0.0.0:2379
+      - ETCD_ADVERTISE_CLIENT_URLS=http://etcd:2379
+      - ETCD_LISTEN_PEER_URLS=http://0.0.0.0:2380
+      - ETCD_INITIAL_ADVERTISE_PEER_URLS=http://etcd:2380
+      - ETCD_INITIAL_CLUSTER=etcd1=http://etcd:2380
+      - ETCD_INITIAL_CLUSTER_STATE=new
+    ports:
+      - "2379:2379"
+    healthcheck:
+      test: ["CMD", "etcdctl", "endpoint", "health"]
+      interval: 5s
+      timeout: 3s
+      retries: 5
+
+  redis:
+    image: redis:7-alpine
+    container_name: redis
+    restart: always
+    ports:
+      - "6379:6379"
+    healthcheck:
+      test: ["CMD", "redis-cli", "ping"]
+      interval: 5s
+      timeout: 3s
+      retries: 5
+
   wallet-service:
     build:
       context: .
@@ -60,6 +93,10 @@ services:
         condition: service_started
       postgres:
         condition: service_healthy
+      etcd:
+        condition: service_healthy
+      redis:
+        condition: service_healthy
     ports:
       - "2113:2113"
     environment:
@@ -67,6 +104,8 @@ services:
       - BTC_RPC_HOST=bitcoind:18443/wallet/blitz_wallet
       - ETH_RPC_HOST=http://geth:8545
       - DATABASE_URL=postgres://blitz:blitz@postgres:5432/blitz?sslmode=disable
+      - ETCD_ENDPOINTS=etcd:2379
+      - REDIS_URL=redis://redis:6379
     volumes:
       - wallet-data:/app/data
 

@@ -8,15 +8,19 @@ import (
 	"os"
 	"os/signal"
 	"syscall"
+	"time"
 
 	"github.com/Ixecd/web3-blitz/internal/api"
 	"github.com/Ixecd/web3-blitz/internal/db"
+	"github.com/Ixecd/web3-blitz/internal/lock"
 	"github.com/Ixecd/web3-blitz/internal/wallet/btc"
 	"github.com/Ixecd/web3-blitz/internal/wallet/core"
 	"github.com/Ixecd/web3-blitz/internal/wallet/eth"
 	"github.com/Ixecd/web3-blitz/internal/wallet/types"
 	"github.com/btcsuite/btcd/rpcclient"
 	"github.com/ethereum/go-ethereum/ethclient"
+
+	clientv3 "go.etcd.io/etcd/client/v3"
 )
 
 func main() {
@@ -38,6 +42,36 @@ func main() {
 	// DB操作句柄
 	queries := db.New(database)
 	log.Println("✅ 数据库已连接")
+
+	// redisURL := os.Getenv("REDIS_URL")
+	// if redisURL == "" {
+	// 	redisURL = "redis://localhost:6379"
+	// }
+	// redisOpt, err := redis.ParseURL(redisURL)
+	// if err != nil {
+	// 	log.Fatal("Redis URL 解析失败:", err)
+	// }
+	// redisClient := redis.NewClient(redisOpt)
+	// if err := redisClient.Ping(context.Background()).Err(); err != nil {
+	// 	log.Fatal("Redis 连接失败:", err)
+	// }
+	// log.Println("✅ Redis 已连接")
+
+	etcdEndpoints := os.Getenv("ETCD_ENDPOINTS")
+	if etcdEndpoints == "" {
+		etcdEndpoints = "localhost:2379"
+	}
+	etcdClient, err := clientv3.New(clientv3.Config{
+		Endpoints:   []string{etcdEndpoints},
+		DialTimeout: 5 * time.Second,
+	})
+	if err != nil {
+		log.Fatal("etcd 连接失败:", err)
+	}
+	defer etcdClient.Close()
+	log.Println("✅ etcd 已连接")
+
+	locker := lock.NewDistributedLock(etcdClient, 30)
 
 	// 先创建空的registry
 	registry := types.NewAddressRegistry()
@@ -87,7 +121,8 @@ func main() {
 	watcher := btc.NewDepositWatcher(btcRPC, registry)
 	ethWatcher := eth.NewETHDepositWatcher(ethRPC, registry)
 
-	h := api.NewHandler(btcWallet, ethWallet, queries)
+	// h := api.NewHandler(btcWallet, ethWallet, queries, redisClient)
+	h := api.NewHandler(btcWallet, ethWallet, queries, locker)
 	mux := api.NewMux(h)
 
 	confirmChecker := core.NewConfirmChecker(queries, btcRPC, ethRPC)

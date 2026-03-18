@@ -11,6 +11,7 @@ import (
 	"time"
 
 	"github.com/Ixecd/web3-blitz/internal/api"
+	"github.com/Ixecd/web3-blitz/internal/config"
 	"github.com/Ixecd/web3-blitz/internal/db"
 	"github.com/Ixecd/web3-blitz/internal/lock"
 	"github.com/Ixecd/web3-blitz/internal/wallet/btc"
@@ -42,20 +43,6 @@ func main() {
 	// DB操作句柄
 	queries := db.New(database)
 	log.Println("✅ 数据库已连接")
-
-	// redisURL := os.Getenv("REDIS_URL")
-	// if redisURL == "" {
-	// 	redisURL = "redis://localhost:6379"
-	// }
-	// redisOpt, err := redis.ParseURL(redisURL)
-	// if err != nil {
-	// 	log.Fatal("Redis URL 解析失败:", err)
-	// }
-	// redisClient := redis.NewClient(redisOpt)
-	// if err := redisClient.Ping(context.Background()).Err(); err != nil {
-	// 	log.Fatal("Redis 连接失败:", err)
-	// }
-	// log.Println("✅ Redis 已连接")
 
 	etcdEndpoints := os.Getenv("ETCD_ENDPOINTS")
 	if etcdEndpoints == "" {
@@ -112,20 +99,27 @@ func main() {
 	// 从环境变量读热钱包私钥
 	hotKeyHex := os.Getenv("ETH_HOT_WALLET_KEY")
 
-	// 业务组件
-	btcWallet := btc.NewBTCWallet(hdWallet, btcRPC, registry, queries)
-	ethWallet := eth.NewETHWallet(hdWallet, ethRPC, registry, queries, hotKeyHex)
+	// 创建 Holder
+	btcRPCHolder := config.NewBTCRPCHolder(btcRPC)
+	ethRPCHolder := config.NewETHRPCHolder(ethRPC)
+
+	// ConfigWatcher
+	configWatcher := config.NewConfigWatcher(etcdClient, btcRPCHolder, ethRPCHolder, "user", "pass")
+	go configWatcher.Start(ctx)
+
+	// 组件注入 Holder 而非直接的 rpc 客户端
+	btcWallet := btc.NewBTCWallet(hdWallet, btcRPCHolder, registry, queries)
+	ethWallet := eth.NewETHWallet(hdWallet, ethRPCHolder, registry, queries, hotKeyHex)
+	watcher := btc.NewDepositWatcher(btcRPCHolder, registry)
+	ethWatcher := eth.NewETHDepositWatcher(ethRPCHolder, registry)
+	confirmChecker := core.NewConfirmChecker(queries, btcRPCHolder, ethRPCHolder, etcdClient)
 
 	log.Println("🚀 Wallet Core 服务已启动（真实 RPC 已连接）")
-
-	watcher := btc.NewDepositWatcher(btcRPC, registry)
-	ethWatcher := eth.NewETHDepositWatcher(ethRPC, registry)
 
 	// h := api.NewHandler(btcWallet, ethWallet, queries, redisClient)
 	h := api.NewHandler(btcWallet, ethWallet, queries, locker)
 	mux := api.NewMux(h)
 
-	confirmChecker := core.NewConfirmChecker(queries, btcRPC, ethRPC, etcdClient)
 	go confirmChecker.Start(ctx)
 	// 开始扫块
 	go watcher.Start(ctx)

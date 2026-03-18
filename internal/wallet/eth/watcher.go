@@ -6,19 +6,19 @@ import (
 	"math/big"
 	"time"
 
+	"github.com/Ixecd/web3-blitz/internal/config"
 	"github.com/Ixecd/web3-blitz/internal/wallet/types"
 	"github.com/ethereum/go-ethereum/common"
-	"github.com/ethereum/go-ethereum/ethclient"
 )
 
 type ETHDepositWatcher struct {
-	rpc        *ethclient.Client
+	rpc        *config.ETHRPCHolder
 	registry   *types.AddressRegistry
 	deposits   chan types.DepositRecord
 	lastHeight uint64
 }
 
-func NewETHDepositWatcher(rpc *ethclient.Client, registry *types.AddressRegistry) *ETHDepositWatcher {
+func NewETHDepositWatcher(rpc *config.ETHRPCHolder, registry *types.AddressRegistry) *ETHDepositWatcher {
 	return &ETHDepositWatcher{
 		rpc:      rpc,
 		registry: registry,
@@ -33,7 +33,7 @@ func (w *ETHDepositWatcher) Deposits() <-chan types.DepositRecord {
 func (w *ETHDepositWatcher) Start(ctx context.Context) {
 	log.Println("🔍 ETH Deposit Watcher 已启动")
 
-	header, err := w.rpc.HeaderByNumber(ctx, nil)
+	header, err := w.rpc.Get().HeaderByNumber(ctx, nil)
 	if err != nil {
 		log.Printf("[ERROR] 获取ETH最新块高失败: %v", err)
 		return
@@ -56,7 +56,7 @@ func (w *ETHDepositWatcher) Start(ctx context.Context) {
 }
 
 func (w *ETHDepositWatcher) scanNewBlocks(ctx context.Context) {
-	header, err := w.rpc.HeaderByNumber(ctx, nil)
+	header, err := w.rpc.Get().HeaderByNumber(ctx, nil)
 	if err != nil {
 		log.Printf("[ERROR] ETH scanNewBlocks: %v", err)
 		return
@@ -74,7 +74,7 @@ func (w *ETHDepositWatcher) scanNewBlocks(ctx context.Context) {
 }
 
 func (w *ETHDepositWatcher) processBlock(ctx context.Context, height uint64) {
-	block, err := w.rpc.BlockByNumber(ctx, new(big.Int).SetUint64(height))
+	block, err := w.rpc.Get().BlockByNumber(ctx, new(big.Int).SetUint64(height))
 	if err != nil {
 		log.Printf("[ERROR] ETH BlockByNumber(%d): %v", height, err)
 		return

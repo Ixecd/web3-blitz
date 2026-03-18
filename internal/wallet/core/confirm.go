@@ -5,10 +5,9 @@ import (
 	"log"
 	"time"
 
+	"github.com/Ixecd/web3-blitz/internal/config"
 	"github.com/Ixecd/web3-blitz/internal/db"
-	"github.com/btcsuite/btcd/rpcclient"
 	clientv3 "go.etcd.io/etcd/client/v3"
-	"github.com/ethereum/go-ethereum/ethclient"
 )
 
 const (
@@ -20,12 +19,12 @@ const (
 
 type ConfirmChecker struct {
 	queries    *db.Queries
-	btcRPC     *rpcclient.Client
-	ethRPC     *ethclient.Client
+	btcRPC     *config.BTCRPCHolder
+	ethRPC     *config.ETHRPCHolder
 	etcdClient *clientv3.Client
 }
 
-func NewConfirmChecker(queries *db.Queries, btcRPC *rpcclient.Client, ethRPC *ethclient.Client, etcdClient *clientv3.Client) *ConfirmChecker {
+func NewConfirmChecker(queries *db.Queries, btcRPC *config.BTCRPCHolder, ethRPC *config.ETHRPCHolder, etcdClient *clientv3.Client) *ConfirmChecker {
 	return &ConfirmChecker{
 		queries:    queries,
 		btcRPC:     btcRPC,
@@ -123,12 +122,12 @@ func (c *ConfirmChecker) check(ctx context.Context) {
 	}
 
 	var btcHeight int64
-	if info, err := c.btcRPC.GetBlockChainInfo(); err == nil {
+	if info, err := c.btcRPC.Get().GetBlockChainInfo(); err == nil {
 		btcHeight = int64(info.Blocks)
 	}
 
 	var ethHeight int64
-	if header, err := c.ethRPC.HeaderByNumber(ctx, nil); err == nil {
+	if header, err := c.ethRPC.Get().HeaderByNumber(ctx, nil); err == nil {
 		ethHeight = header.Number.Int64()
 	}
 

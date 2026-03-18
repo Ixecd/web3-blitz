@@ -5,21 +5,21 @@ import (
 	"log"
 	"time"
 
+	"github.com/Ixecd/web3-blitz/internal/config"
 	"github.com/Ixecd/web3-blitz/internal/wallet/types"
 	"github.com/btcsuite/btcd/btcutil"
 	"github.com/btcsuite/btcd/chaincfg"
-	"github.com/btcsuite/btcd/rpcclient"
 )
 
 // DepositWatcher 监听BTC充值
 type DepositWatcher struct {
-	rpc      *rpcclient.Client
-	registry *types.AddressRegistry
-	deposits chan types.DepositRecord
+	rpc        *config.BTCRPCHolder
+	registry   *types.AddressRegistry
+	deposits   chan types.DepositRecord
 	lastHeight int64
 }
 
-func NewDepositWatcher(rpc *rpcclient.Client, registry *types.AddressRegistry) *DepositWatcher {
+func NewDepositWatcher(rpc *config.BTCRPCHolder, registry *types.AddressRegistry) *DepositWatcher {
 	return &DepositWatcher{
 		rpc:      rpc,
 		registry: registry,
@@ -37,7 +37,7 @@ func (w *DepositWatcher) Start(ctx context.Context) {
 	log.Println("🔍 Deposit Watcher 已启动")
 
 	// 从当前最新块开始扫
-	info, err := w.rpc.GetBlockChainInfo()
+	info, err := w.rpc.Get().GetBlockChainInfo()
 	if err != nil {
 		log.Printf("[ERROR] 获取链信息失败: %v", err)
 		return
@@ -60,7 +60,7 @@ func (w *DepositWatcher) Start(ctx context.Context) {
 }
 
 func (w *DepositWatcher) scanNewBlocks() {
-	info, err := w.rpc.GetBlockChainInfo()
+	info, err := w.rpc.Get().GetBlockChainInfo()
 	if err != nil {
 		log.Printf("[ERROR] scanNewBlocks: %v", err)
 		return
@@ -78,13 +78,13 @@ func (w *DepositWatcher) scanNewBlocks() {
 }
 
 func (w *DepositWatcher) processBlock(height int64) {
-	hash, err := w.rpc.GetBlockHash(height)
+	hash, err := w.rpc.Get().GetBlockHash(height)
 	if err != nil {
 		log.Printf("[ERROR] GetBlockHash(%d): %v", height, err)
 		return
 	}
 
-	block, err := w.rpc.GetBlockVerboseTx(hash)
+	block, err := w.rpc.Get().GetBlockVerboseTx(hash)
 	if err != nil {
 		log.Printf("[ERROR] GetBlockVerboseTx: %v", err)
 		return

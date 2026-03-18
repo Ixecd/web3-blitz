@@ -27,7 +27,7 @@ func (w *BTCWallet) Withdraw(ctx context.Context, toAddress string, amount float
 		return WithdrawResult{}, fmt.Errorf("金额转换失败: %w", err)
 	}
 
-	txHash, err := w.rpc.SendToAddress(addr, satoshis)
+	txHash, err := w.rpcHolder.Get().SendToAddress(addr, satoshis)
 	if err != nil {
 		return WithdrawResult{}, fmt.Errorf("BTC 广播失败: %w", err)
 	}
@@ -39,7 +39,7 @@ func (w *BTCWallet) Withdraw(ctx context.Context, toAddress string, amount float
 
 // queryFee 通过 GetTransaction 回查实际扣除的手续费
 func (w *BTCWallet) queryFee(txHash *chainhash.Hash) float64 {
-	tx, err := w.rpc.GetTransaction(txHash)
+	tx, err := w.rpcHolder.Get().GetTransaction(txHash)
 	if err != nil {
 		log.Printf("[WARN] 回查 BTC fee 失败 txid=%s: %v", txHash.String(), err)
 		return 0

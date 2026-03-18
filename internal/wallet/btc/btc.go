@@ -5,23 +5,23 @@ import (
 	"fmt"
 	"log"
 
+	"github.com/Ixecd/web3-blitz/internal/config"
 	"github.com/Ixecd/web3-blitz/internal/db"
 	"github.com/Ixecd/web3-blitz/internal/wallet/core"
 	"github.com/Ixecd/web3-blitz/internal/wallet/types"
 	"github.com/btcsuite/btcd/btcutil"
 	"github.com/btcsuite/btcd/chaincfg"
-	"github.com/btcsuite/btcd/rpcclient"
 )
 
 type BTCWallet struct {
-	hdWallet *core.HDWallet
-	rpc      *rpcclient.Client // 新增：真实 RPC 客户端
-	registry *types.AddressRegistry
-	queries  *db.Queries // 加这个
+	hdWallet  *core.HDWallet
+	rpcHolder *config.BTCRPCHolder
+	registry  *types.AddressRegistry
+	queries   *db.Queries // 加这个
 }
 
-func NewBTCWallet(hd *core.HDWallet, rpc *rpcclient.Client, registry *types.AddressRegistry, queries *db.Queries) *BTCWallet {
-	return &BTCWallet{hdWallet: hd, rpc: rpc, registry: registry, queries: queries}
+func NewBTCWallet(hd *core.HDWallet, rpcHolder *config.BTCRPCHolder, registry *types.AddressRegistry, queries *db.Queries) *BTCWallet {
+	return &BTCWallet{hdWallet: hd, rpcHolder: rpcHolder, registry: registry, queries: queries}
 }
 
 // GenerateDepositAddress 生成真实 BTC 地址（BIP44）+ 自动导入到 miner 钱包（关键！）
@@ -87,7 +87,7 @@ func (w *BTCWallet) GetBalance(ctx context.Context, address string, chain types.
 	}
 
 	// 2. 查询该地址收到的总金额
-	bal, err := w.rpc.GetReceivedByAddress(addr)
+	bal, err := w.rpcHolder.Get().GetReceivedByAddress(addr)
 	if err != nil {
 		return types.BalanceResponse{}, fmt.Errorf("查询 BTC 余额失败: %w", err)
 	}

@@ -29,17 +29,17 @@ func (w *ETHWallet) Withdraw(ctx context.Context, toAddress string, amount float
 		Mul(new(big.Float).SetFloat64(amount), new(big.Float).SetFloat64(1e18)).
 		Int(nil)
 
-	nonce, err := w.rpc.PendingNonceAt(ctx, fromAddr)
+	nonce, err := w.rpcHolder.Get().PendingNonceAt(ctx, fromAddr)
 	if err != nil {
 		return WithdrawResult{}, fmt.Errorf("获取 nonce 失败: %w", err)
 	}
 
-	gasPrice, err := w.rpc.SuggestGasPrice(ctx)
+	gasPrice, err := w.rpcHolder.Get().SuggestGasPrice(ctx)
 	if err != nil {
 		return WithdrawResult{}, fmt.Errorf("获取 gasPrice 失败: %w", err)
 	}
 
-	chainID, err := w.rpc.ChainID(ctx)
+	chainID, err := w.rpcHolder.Get().ChainID(ctx)
 	if err != nil {
 		return WithdrawResult{}, fmt.Errorf("获取 chainID 失败: %w", err)
 	}
@@ -52,7 +52,7 @@ func (w *ETHWallet) Withdraw(ctx context.Context, toAddress string, amount float
 		return WithdrawResult{}, fmt.Errorf("交易签名失败: %w", err)
 	}
 
-	if err := w.rpc.SendTransaction(ctx, signedTx); err != nil {
+	if err := w.rpcHolder.Get().SendTransaction(ctx, signedTx); err != nil {
 		return WithdrawResult{}, fmt.Errorf("广播交易失败: %w", err)
 	}
 

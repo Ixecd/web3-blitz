@@ -133,7 +133,7 @@ func main() {
 			if deposit.Confirmed {
 				confirmed = 1
 			}
-			err := queries.CreateDeposit(context.Background(), db.CreateDepositParams{
+			params := db.CreateDepositParams{
 				TxID:      deposit.TxID,
 				Address:   deposit.Address,
 				UserID:    deposit.UserID,
@@ -141,11 +141,21 @@ func main() {
 				Height:    int64(deposit.Height),
 				Confirmed: confirmed,
 				Chain:     string(deposit.Chain),
-			})
-			if err != nil {
-				log.Printf("[ERROR] %s写入deposit失败: %v", chainName, err)
-			} else {
-				log.Printf("✅ %s deposit已写入DB: txid=%s", chainName, deposit.TxID)
+			}
+
+			const maxRetries = 3
+			var lastErr error
+			for i := range maxRetries {
+				lastErr = queries.CreateDeposit(context.Background(), params)
+				if lastErr == nil {
+					log.Printf("✅ %s deposit已写入DB: txid=%s", chainName, deposit.TxID)
+					break
+				}
+				log.Printf("[WARN] %s写入deposit失败(第%d次): %v", chainName, i+1, lastErr)
+				time.Sleep(time.Duration(i+1) * time.Second) // 1s, 2s, 3s 递增等待
+			}
+			if lastErr != nil {
+				log.Printf("[ERROR] %s deposit写入最终失败，txid=%s: %v", chainName, deposit.TxID, lastErr)
 			}
 		}
 	}

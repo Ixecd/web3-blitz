@@ -2,9 +2,12 @@ package eth
 
 import (
 	"context"
+	"crypto/ecdsa"
+	"encoding/hex"
 	"fmt"
 	"log"
 	"math/big"
+	"strings"
 
 	"github.com/Ixecd/web3-blitz/internal/db"
 	"github.com/Ixecd/web3-blitz/internal/wallet/core"
@@ -19,10 +22,23 @@ type ETHWallet struct {
 	rpc      *ethclient.Client // 新增：真实 Geth 客户端
 	registry *types.AddressRegistry
 	queries  *db.Queries
+	hotKey   *ecdsa.PrivateKey // 热钱包私钥，用于签名提币交易
 }
 
-func NewETHWallet(hd *core.HDWallet, rpc *ethclient.Client, registry *types.AddressRegistry, queries *db.Queries) *ETHWallet {
-	return &ETHWallet{hdWallet: hd, rpc: rpc, registry: registry, queries: queries}
+// NewETHWallet hotKeyHex 是热钱包私钥的 hex 字符串（不含 0x 前缀）
+// geth dev 模式下可从 geth 日志拿到预置账户私钥
+func NewETHWallet(hd *core.HDWallet, rpc *ethclient.Client, registry *types.AddressRegistry, queries *db.Queries, hotKeyHex string) *ETHWallet {
+	var hotKey *ecdsa.PrivateKey
+	if hotKeyHex != "" {
+		keyBytes, err := hex.DecodeString(strings.TrimPrefix(hotKeyHex, "0x"))
+		if err == nil {
+			hotKey, err = crypto.ToECDSA(keyBytes)
+			if err != nil {
+				log.Printf("[WARN] ETH热钱包私钥解析失败: %v", err)
+			}
+		}
+	}
+	return &ETHWallet{hdWallet: hd, rpc: rpc, registry: registry, queries: queries, hotKey: hotKey}
 }
 
 // GenerateDepositAddress 生成真实 ETH 充值地址（BIP44）

@@ -11,6 +11,7 @@ import (
 type Querier interface {
 	CreateDeposit(ctx context.Context, arg CreateDepositParams) error
 	CreateDepositAddress(ctx context.Context, arg CreateDepositAddressParams) error
+	CreateWithdrawal(ctx context.Context, arg CreateWithdrawalParams) (Withdrawal, error)
 	GetAddressByAddress(ctx context.Context, address string) (DepositAddress, error)
 	GetAllChainsTotalDeposit(ctx context.Context) (interface{}, error)
 	GetDepositByTxID(ctx context.Context, txID string) (Deposit, error)
@@ -21,6 +22,8 @@ type Querier interface {
 	ListDepositsByChain(ctx context.Context, chain string) ([]Deposit, error)
 	ListDepositsByUserID(ctx context.Context, userID string) ([]Deposit, error)
 	ListUnconfirmedDeposits(ctx context.Context) ([]Deposit, error)
+	ListWithdrawalsByUserID(ctx context.Context, userID string) ([]Withdrawal, error)
+	UpdateWithdrawalTx(ctx context.Context, arg UpdateWithdrawalTxParams) error
 }
 
 var _ Querier = (*Queries)(nil)

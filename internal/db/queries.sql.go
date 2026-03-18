@@ -7,6 +7,7 @@ package db
 
 import (
 	"context"
+	"database/sql"
 )
 
 const createDeposit = `-- name: CreateDeposit :exec
@@ -57,6 +58,42 @@ func (q *Queries) CreateDepositAddress(ctx context.Context, arg CreateDepositAdd
 		arg.Path,
 	)
 	return err
+}
+
+const createWithdrawal = `-- name: CreateWithdrawal :one
+INSERT INTO withdrawals (address, user_id, amount, fee, status, chain)
+VALUES (?, ?, ?, 0, 'pending', ?)
+RETURNING id, tx_id, address, user_id, amount, fee, status, chain, created_at, updated_at
+`
+
+type CreateWithdrawalParams struct {
+	Address string  `db:"address" json:"address"`
+	UserID  string  `db:"user_id" json:"user_id"`
+	Amount  float64 `db:"amount" json:"amount"`
+	Chain   string  `db:"chain" json:"chain"`
+}
+
+func (q *Queries) CreateWithdrawal(ctx context.Context, arg CreateWithdrawalParams) (Withdrawal, error) {
+	row := q.db.QueryRowContext(ctx, createWithdrawal,
+		arg.Address,
+		arg.UserID,
+		arg.Amount,
+		arg.Chain,
+	)
+	var i Withdrawal
+	err := row.Scan(
+		&i.ID,
+		&i.TxID,
+		&i.Address,
+		&i.UserID,
+		&i.Amount,
+		&i.Fee,
+		&i.Status,
+		&i.Chain,
+		&i.CreatedAt,
+		&i.UpdatedAt,
+	)
+	return i, err
 }
 
 const getAddressByAddress = `-- name: GetAddressByAddress :one
@@ -325,4 +362,65 @@ func (q *Queries) ListUnconfirmedDeposits(ctx context.Context) ([]Deposit, error
 		return nil, err
 	}
 	return items, nil
+}
+
+const listWithdrawalsByUserID = `-- name: ListWithdrawalsByUserID :many
+SELECT id, tx_id, address, user_id, amount, fee, status, chain, created_at, updated_at FROM withdrawals WHERE user_id = ? ORDER BY created_at DESC
+`
+
+func (q *Queries) ListWithdrawalsByUserID(ctx context.Context, userID string) ([]Withdrawal, error) {
+	rows, err := q.db.QueryContext(ctx, listWithdrawalsByUserID, userID)
+	if err != nil {
+		return nil, err
+	}
+	defer rows.Close()
+	var items []Withdrawal
+	for rows.Next() {
+		var i Withdrawal
+		if err := rows.Scan(
+			&i.ID,
+			&i.TxID,
+			&i.Address,
+			&i.UserID,
+			&i.Amount,
+			&i.Fee,
+			&i.Status,
+			&i.Chain,
+			&i.CreatedAt,
+			&i.UpdatedAt,
+		); err != nil {
+			return nil, err
+		}
+		items = append(items, i)
+	}
+	if err := rows.Close(); err != nil {
+		return nil, err
+	}
+	if err := rows.Err(); err != nil {
+		return nil, err
+	}
+	return items, nil
+}
+
+const updateWithdrawalTx = `-- name: UpdateWithdrawalTx :exec
+UPDATE withdrawals
+SET tx_id = ?, fee = ?, status = ?, updated_at = CURRENT_TIMESTAMP
+WHERE id = ?
+`
+
+type UpdateWithdrawalTxParams struct {
+	TxID   sql.NullString `db:"tx_id" json:"tx_id"`
+	Fee    float64        `db:"fee" json:"fee"`
+	Status string         `db:"status" json:"status"`
+	ID     int64          `db:"id" json:"id"`
+}
+
+func (q *Queries) UpdateWithdrawalTx(ctx context.Context, arg UpdateWithdrawalTxParams) error {
+	_, err := q.db.ExecContext(ctx, updateWithdrawalTx,
+		arg.TxID,
+		arg.Fee,
+		arg.Status,
+		arg.ID,
+	)
+	return err
 }

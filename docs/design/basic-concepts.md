@@ -92,4 +92,3 @@ user999|m/44'/0'/0'/0/999|第1000个充值地址
 这个老包内部死扣了一个**超级老的 btcec 路径**（`github.com/btcsuite/btcd/btcec`），无论我们怎么 replace、怎么换版本，它都会偷偷拉旧版，导致 `unknown revision` 报错。
 
 我们最后换成了 `github.com/tyler-smith/go-bip32` 这个现代干净库，它不带那些历史包袱，直接用新版 `btcec/v2`，所以整个模块图瞬间干净了。
-

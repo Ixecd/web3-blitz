@@ -43,3 +43,16 @@ WHERE chain = ? AND confirmed = 1;
 SELECT COALESCE(SUM(amount), 0) as total
 FROM deposits
 WHERE confirmed = 1;
+
+-- name: CreateWithdrawal :one
+INSERT INTO withdrawals (address, user_id, amount, fee, status, chain)
+VALUES (?, ?, ?, 0, 'pending', ?)
+RETURNING *;
+
+-- name: UpdateWithdrawalTx :exec
+UPDATE withdrawals
+SET tx_id = ?, fee = ?, status = ?, updated_at = CURRENT_TIMESTAMP
+WHERE id = ?;
+
+-- name: ListWithdrawalsByUserID :many
+SELECT * FROM withdrawals WHERE user_id = ? ORDER BY created_at DESC;

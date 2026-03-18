@@ -13,5 +13,6 @@ func NewMux(h *Handler) *http.ServeMux {
 	mux.HandleFunc("/api/v1/balance", h.GetBalance)
 	mux.HandleFunc("/api/v1/deposits", h.ListDeposits)
 	mux.HandleFunc("/api/v1/balance/total", h.GetTotalBalance)
+	mux.HandleFunc("/api/v1/withdraw", h.Withdraw)
 	return mux
 }

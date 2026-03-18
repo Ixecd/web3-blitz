@@ -74,9 +74,12 @@ func main() {
 	btcRPC, _ := rpcclient.New(btcCfg, nil)
 	ethRPC, _ := ethclient.Dial(ethRPCHost)
 
+	// 从环境变量读热钱包私钥
+	hotKeyHex := os.Getenv("ETH_HOT_WALLET_KEY")
+
 	// 业务组件
 	btcWallet := btc.NewBTCWallet(hdWallet, btcRPC, registry, queries)
-	ethWallet := eth.NewETHWallet(hdWallet, ethRPC, registry, queries)
+	ethWallet := eth.NewETHWallet(hdWallet, ethRPC, registry, queries, hotKeyHex)
 
 	log.Println("🚀 Wallet Core 服务已启动（真实 RPC 已连接）")
 

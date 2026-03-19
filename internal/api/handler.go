@@ -8,6 +8,7 @@ import (
 	"log"
 	"net/http"
 
+	"github.com/Ixecd/web3-blitz/internal/auth"
 	"github.com/Ixecd/web3-blitz/internal/db"
 	"github.com/Ixecd/web3-blitz/internal/lock"
 	"github.com/Ixecd/web3-blitz/internal/wallet/btc"
@@ -19,17 +20,17 @@ type Handler struct {
 	btcWallet *btc.BTCWallet
 	ethWallet *eth.ETHWallet
 	queries   *db.Queries
-	// redis     *redis.Client
-	locker *lock.DistributedLock
+	locker    *lock.DistributedLock
+	jwtSecret string
 }
 
-func NewHandler(btcWallet *btc.BTCWallet, ethWallet *eth.ETHWallet, queries *db.Queries, locker *lock.DistributedLock) *Handler {
+func NewHandler(btcWallet *btc.BTCWallet, ethWallet *eth.ETHWallet, queries *db.Queries, locker *lock.DistributedLock, jwtSecret string) *Handler {
 	return &Handler{
 		btcWallet: btcWallet,
 		ethWallet: ethWallet,
 		queries:   queries,
-		// redis:     redis,
-		locker: locker,
+		locker:    locker,
+		jwtSecret: jwtSecret,
 	}
 }
 
@@ -363,4 +364,87 @@ func (h *Handler) ListWithdrawals(w http.ResponseWriter, r *http.Request) {
 	}
 
 	json.NewEncoder(w).Encode(resp)
+}
+
+func (h *Handler) Register(w http.ResponseWriter, r *http.Request) {
+	if r.Method != http.MethodPost {
+		http.Error(w, "只支持 POST", http.StatusMethodNotAllowed)
+		return
+	}
+
+	var req struct {
+		Username string `json:"username"`
+		Password string `json:"password"`
+	}
+	if err := json.NewDecoder(r.Body).Decode(&req); err != nil {
+		http.Error(w, "参数错误", http.StatusBadRequest)
+		return
+	}
+	if req.Username == "" || req.Password == "" {
+		http.Error(w, "username 和 password 不能为空", http.StatusBadRequest)
+		return
+	}
+	if len(req.Password) < 8 {
+		http.Error(w, "密码长度不能少于8位", http.StatusBadRequest)
+		return
+	}
+
+	hashed, err := auth.HashPassword(req.Password)
+	if err != nil {
+		http.Error(w, "密码加密失败", http.StatusInternalServerError)
+		return
+	}
+
+	user, err := h.queries.CreateUser(r.Context(), db.CreateUserParams{
+		Username: req.Username,
+		Password: hashed,
+	})
+	if err != nil {
+		http.Error(w, "用户名已存在", http.StatusConflict)
+		return
+	}
+
+	json.NewEncoder(w).Encode(map[string]interface{}{
+		"id":       user.ID,
+		"username": user.Username,
+	})
+}
+
+func (h *Handler) Login(w http.ResponseWriter, r *http.Request) {
+	if r.Method != http.MethodPost {
+		http.Error(w, "只支持 POST", http.StatusMethodNotAllowed)
+		return
+	}
+
+	var req struct {
+		Username string `json:"username"`
+		Password string `json:"password"`
+	}
+	if err := json.NewDecoder(r.Body).Decode(&req); err != nil {
+		http.Error(w, "参数错误", http.StatusBadRequest)
+		return
+	}
+
+	user, err := h.queries.GetUserByUsername(r.Context(), req.Username)
+	if err != nil {
+		http.Error(w, "用户名或密码错误", http.StatusUnauthorized)
+		return
+	}
+
+	if !auth.CheckPassword(req.Password, user.Password) {
+		http.Error(w, "用户名或密码错误", http.StatusUnauthorized)
+		return
+	}
+
+	token, err := auth.GenerateToken(user.ID, user.Username, h.jwtSecret)
+	if err != nil {
+		http.Error(w, "生成 token 失败", http.StatusInternalServerError)
+		return
+	}
+
+	json.NewEncoder(w).Encode(map[string]interface{}{
+		"token":    token,
+		"username": user.Username,
+		"user_id":  user.ID,
+	})
 }

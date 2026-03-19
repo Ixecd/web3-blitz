@@ -116,9 +116,15 @@ func main() {
 
 	log.Println("🚀 Wallet Core 服务已启动（真实 RPC 已连接）")
 
+	jwtSecret := os.Getenv("JWT_SECRET")
+	if jwtSecret == "" {
+		jwtSecret = "dev-secret-change-in-production"
+		log.Println("⚠️  使用测试 JWT secret（生产环境请务必设置 JWT_SECRET 环境变量）")
+	}
+
 	// h := api.NewHandler(btcWallet, ethWallet, queries, redisClient)
-	h := api.NewHandler(btcWallet, ethWallet, queries, locker)
-	mux := api.NewMux(h)
+	h := api.NewHandler(btcWallet, ethWallet, queries, locker, jwtSecret)
+	mux := api.NewMux(h, jwtSecret)
 
 	go confirmChecker.Start(ctx)
 	// 开始扫块

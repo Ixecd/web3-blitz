@@ -1,0 +1,59 @@
+name: CI
+
+on:
+  push:
+    branches: [ main ]
+  pull_request:
+    branches: [ main ]
+
+jobs:
+  ci:
+    name: Build & Test
+    runs-on: ubuntu-latest
+
+    services:
+      postgres:
+        image: postgres:16-alpine
+        env:
+          POSTGRES_USER: blitz
+          POSTGRES_PASSWORD: blitz
+          POSTGRES_DB: blitz
+        ports:
+          - 5432:5432
+        options: >-
+          --health-cmd pg_isready
+          --health-interval 5s
+          --health-timeout 3s
+          --health-retries 5
+
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Set up Go
+        uses: actions/setup-go@v5
+        with:
+          go-version: '1.25'
+          cache: true
+
+      - name: Init DB schema
+        run: |
+          PGPASSWORD=blitz psql -h localhost -U blitz -d blitz -f internal/db/schema.sql
+
+      - name: Build
+        run: go build ./...
+
+      - name: Vet
+        run: go vet ./...
+
+      - name: Test
+        run: go test ./...
+        env:
+          DATABASE_URL: postgres://blitz:blitz@localhost:5432/blitz?sslmode=disable
+
+      - name: Docker build
+        run: |
+          docker build \
+            -f build/docker/wallet-service/Dockerfile \
+            -t wallet-service:ci \
+            .

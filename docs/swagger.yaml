@@ -1,0 +1,452 @@
+swagger: "2.0"
+info:
+  title: web3-blitz API
+  description: 交易所钱包充提币系统 API 文档
+  version: "0.1.1"
+  contact:
+    name: Ixecd
+    url: https://github.com/Ixecd/web3-blitz
+
+host: localhost:2113
+basePath: /
+schemes:
+  - http
+
+securityDefinitions:
+  Bearer:
+    type: apiKey
+    name: Authorization
+    in: header
+    description: "格式: Bearer <access_token>"
+
+consumes:
+  - application/json
+produces:
+  - application/json
+
+definitions:
+  Response:
+    type: object
+    properties:
+      code:
+        type: integer
+        description: 错误码（只在失败时出现）
+      message:
+        type: string
+        description: 错误信息（只在失败时出现）
+      data:
+        description: 成功数据（只在成功时出现）
+
+  RegisterRequest:
+    type: object
+    required:
+      - username
+      - password
+    properties:
+      username:
+        type: string
+      password:
+        type: string
+        minLength: 8
+
+  LoginRequest:
+    type: object
+    required:
+      - username
+      - password
+    properties:
+      username:
+        type: string
+      password:
+        type: string
+
+  LoginResponse:
+    type: object
+    properties:
+      access_token:
+        type: string
+      refresh_token:
+        type: string
+      user_id:
+        type: integer
+      username:
+        type: string
+
+  RefreshRequest:
+    type: object
+    required:
+      - refresh_token
+    properties:
+      refresh_token:
+        type: string
+
+  AddressRequest:
+    type: object
+    required:
+      - user_id
+      - chain
+    properties:
+      user_id:
+        type: string
+      chain:
+        type: string
+        enum: [btc, eth]
+
+  AddressResponse:
+    type: object
+    properties:
+      address:
+        type: string
+      path:
+        type: string
+      user_id:
+        type: string
+
+  WithdrawRequest:
+    type: object
+    required:
+      - user_id
+      - to_address
+      - amount
+      - chain
+    properties:
+      user_id:
+        type: string
+      to_address:
+        type: string
+      amount:
+        type: number
+        format: double
+      chain:
+        type: string
+        enum: [btc, eth]
+
+  WithdrawResponse:
+    type: object
+    properties:
+      id:
+        type: integer
+      tx_id:
+        type: string
+      user_id:
+        type: string
+      to_address:
+        type: string
+      amount:
+        type: number
+      fee:
+        type: number
+      status:
+        type: string
+        enum: [completed, failed]
+      chain:
+        type: string
+
+  WithdrawalRecord:
+    type: object
+    properties:
+      id:
+        type: integer
+      tx_id:
+        type: string
+      address:
+        type: string
+      user_id:
+        type: string
+      amount:
+        type: number
+      fee:
+        type: number
+      status:
+        type: string
+      chain:
+        type: string
+      created_at:
+        type: string
+
+paths:
+  /api/v1/register:
+    post:
+      tags:
+        - Auth
+      summary: 用户注册
+      parameters:
+        - in: body
+          name: body
+          required: true
+          schema:
+            $ref: "#/definitions/RegisterRequest"
+      responses:
+        200:
+          description: 注册成功
+          schema:
+            type: object
+            properties:
+              data:
+                type: object
+                properties:
+                  id:
+                    type: integer
+                  username:
+                    type: string
+        400:
+          description: 参数错误
+          schema:
+            $ref: "#/definitions/Response"
+        409:
+          description: 用户名已存在
+          schema:
+            $ref: "#/definitions/Response"
+
+  /api/v1/login:
+    post:
+      tags:
+        - Auth
+      summary: 用户登录
+      parameters:
+        - in: body
+          name: body
+          required: true
+          schema:
+            $ref: "#/definitions/LoginRequest"
+      responses:
+        200:
+          description: 登录成功，返回 access_token 和 refresh_token
+          schema:
+            type: object
+            properties:
+              data:
+                $ref: "#/definitions/LoginResponse"
+        401:
+          description: 用户名或密码错误
+          schema:
+            $ref: "#/definitions/Response"
+
+  /api/v1/refresh:
+    post:
+      tags:
+        - Auth
+      summary: 刷新 Token（旋转策略）
+      parameters:
+        - in: body
+          name: body
+          required: true
+          schema:
+            $ref: "#/definitions/RefreshRequest"
+      responses:
+        200:
+          description: 返回新的 access_token 和 refresh_token，旧 refresh_token 立即失效
+          schema:
+            type: object
+            properties:
+              data:
+                $ref: "#/definitions/LoginResponse"
+        401:
+          description: refresh_token 无效或已过期
+          schema:
+            $ref: "#/definitions/Response"
+
+  /api/v1/logout:
+    post:
+      tags:
+        - Auth
+      summary: 退出登录
+      parameters:
+        - in: body
+          name: body
+          required: true
+          schema:
+            $ref: "#/definitions/RefreshRequest"
+      responses:
+        200:
+          description: 退出成功，refresh_token 被撤销
+          schema:
+            type: object
+            properties:
+              data:
+                type: object
+                properties:
+                  message:
+                    type: string
+
+  /api/v1/address:
+    post:
+      tags:
+        - Wallet
+      summary: 生成充值地址
+      description: 同一 user_id 每次返回相同地址（幂等）
+      parameters:
+        - in: body
+          name: body
+          required: true
+          schema:
+            $ref: "#/definitions/AddressRequest"
+      responses:
+        200:
+          description: 充值地址
+          schema:
+            type: object
+            properties:
+              data:
+                $ref: "#/definitions/AddressResponse"
+        400:
+          description: 参数错误或不支持的链
+          schema:
+            $ref: "#/definitions/Response"
+
+  /api/v1/balance:
+    get:
+      tags:
+        - Wallet
+      summary: 查询链上余额
+      parameters:
+        - in: query
+          name: address
+          type: string
+          required: true
+        - in: query
+          name: chain
+          type: string
+          required: true
+          enum: [btc, eth]
+      responses:
+        200:
+          description: 余额信息
+          schema:
+            type: object
+            properties:
+              data:
+                type: object
+                properties:
+                  address:
+                    type: string
+                  balance:
+                    type: number
+                  chain:
+                    type: string
+
+  /api/v1/balance/total:
+    get:
+      tags:
+        - Wallet
+      summary: 查询累计已确认充值总额
+      parameters:
+        - in: query
+          name: user_id
+          type: string
+          required: true
+        - in: query
+          name: chain
+          type: string
+          required: true
+          enum: [btc, eth]
+      responses:
+        200:
+          description: 累计充值总额
+          schema:
+            type: object
+            properties:
+              data:
+                type: object
+                properties:
+                  user_id:
+                    type: string
+                  chain:
+                    type: string
+                  total:
+                    type: number
+
+  /api/v1/deposits:
+    get:
+      tags:
+        - Wallet
+      summary: 查询充值记录
+      parameters:
+        - in: query
+          name: user_id
+          type: string
+          required: true
+      responses:
+        200:
+          description: 充值记录列表
+          schema:
+            type: object
+            properties:
+              data:
+                type: array
+                items:
+                  type: object
+
+  /api/v1/withdraw:
+    post:
+      tags:
+        - Wallet
+      summary: 发起提币
+      description: |
+        需要 JWT 认证。校验顺序：分布式锁 → 余额校验 → 每日限额校验 → 广播交易
+
+        每日限额（滚动24小时）：
+        - 普通用户：BTC 2，ETH 50
+        - 白银用户：BTC 10，ETH 200
+        - 黄金用户：BTC 50，ETH 1000
+        - 钻石用户：BTC 200，ETH 5000
+      security:
+        - Bearer: []
+      parameters:
+        - in: body
+          name: body
+          required: true
+          schema:
+            $ref: "#/definitions/WithdrawRequest"
+      responses:
+        200:
+          description: 提币成功
+          schema:
+            type: object
+            properties:
+              data:
+                $ref: "#/definitions/WithdrawResponse"
+        400:
+          description: 余额不足或超出每日限额
+          schema:
+            $ref: "#/definitions/Response"
+        401:
+          description: 未认证
+          schema:
+            $ref: "#/definitions/Response"
+        429:
+          description: 重复提交，上一笔正在处理
+          schema:
+            $ref: "#/definitions/Response"
+
+  /api/v1/withdrawals:
+    get:
+      tags:
+        - Wallet
+      summary: 查询提币历史
+      parameters:
+        - in: query
+          name: user_id
+          type: string
+          required: true
+      responses:
+        200:
+          description: 提币记录列表
+          schema:
+            type: object
+            properties:
+              data:
+                type: array
+                items:
+                  $ref: "#/definitions/WithdrawalRecord"
+
+  /metrics:
+    get:
+      tags:
+        - Monitor
+      summary: Prometheus 指标
+      produces:
+        - text/plain
+      responses:
+        200:
+          description: Prometheus 格式指标数据

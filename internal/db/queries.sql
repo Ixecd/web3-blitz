@@ -129,3 +129,41 @@ ORDER BY created_at ASC;
 UPDATE dead_letters
 SET resolved = TRUE, updated_at = NOW()
 WHERE id = @id;
+
+-- name: ListUsers :many
+SELECT id, level, username, created_at, updated_at FROM users ORDER BY created_at DESC;
+
+-- name: GetUserRoles :many
+SELECT r.* FROM roles r
+JOIN user_roles ur ON ur.role_id = r.id
+WHERE ur.user_id = @user_id;
+
+-- name: GetRolePermissions :many
+SELECT p.* FROM permissions p
+JOIN role_permissions rp ON rp.permission_id = p.id
+WHERE rp.role_id = @role_id;
+
+-- name: GetUserPermissions :many
+SELECT DISTINCT p.name FROM permissions p
+JOIN role_permissions rp ON rp.permission_id = p.id
+JOIN user_roles ur ON ur.role_id = rp.role_id
+WHERE ur.user_id = @user_id;
+
+-- name: AssignRoleToUser :exec
+INSERT INTO user_roles (user_id, role_id)
+VALUES (@user_id, @role_id)
+ON CONFLICT DO NOTHING;
+
+-- name: RemoveRoleFromUser :exec
+DELETE FROM user_roles WHERE user_id = @user_id AND role_id = @role_id;
+
+-- name: GetRoleByName :one
+SELECT * FROM roles WHERE name = @name LIMIT 1;
+
+-- name: ListWithdrawalLimits :many
+SELECT * FROM withdrawal_limits ORDER BY level ASC;
+
+-- name: UpdateWithdrawalLimit :exec
+UPDATE withdrawal_limits
+SET btc_daily = @btc_daily, eth_daily = @eth_daily
+WHERE level = @level;

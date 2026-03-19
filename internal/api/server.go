@@ -4,11 +4,12 @@ import (
 	"net/http"
 
 	"github.com/Ixecd/web3-blitz/internal/auth"
+	"github.com/Ixecd/web3-blitz/internal/db"
 
 	"github.com/prometheus/client_golang/prometheus/promhttp"
 )
 
-func NewMux(h *Handler, jwtSecret string) *http.ServeMux {
+func NewMux(h *Handler, jwtSecret string, queries *db.Queries) *http.ServeMux {
 	mux := http.NewServeMux()
 
 	// 公开接口
@@ -25,6 +26,17 @@ func NewMux(h *Handler, jwtSecret string) *http.ServeMux {
 
 	// 需要 JWT 保护的接口
 	mux.HandleFunc("/api/v1/withdraw", auth.JWTMiddleware(jwtSecret, h.Withdraw))
+	// JWT 保护
+	mux.HandleFunc("/api/v1/users/me", auth.JWTMiddleware(jwtSecret, h.GetMe))
+	// JWT + RBAC 保护
+	mux.HandleFunc("/api/v1/users", auth.JWTMiddleware(jwtSecret,
+		auth.RBACMiddleware(queries, "user:read", h.ListUsers)))
+	mux.HandleFunc("/api/v1/users/upgrade", auth.JWTMiddleware(jwtSecret,
+		auth.RBACMiddleware(queries, "user:upgrade", h.UpgradeUser)))
+	mux.HandleFunc("/api/v1/withdrawal-limits", auth.JWTMiddleware(jwtSecret,
+		auth.RBACMiddleware(queries, "limit:read", h.ListWithdrawalLimits)))
+	mux.HandleFunc("/api/v1/withdrawal-limits/update", auth.JWTMiddleware(jwtSecret,
+		auth.RBACMiddleware(queries, "limit:write", h.UpdateWithdrawalLimit)))
 
 	return mux
 }

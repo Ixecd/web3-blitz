@@ -43,6 +43,13 @@ type DepositAddress struct {
 	CreatedAt sql.NullTime `db:"created_at" json:"created_at"`
 }
 
+type Permission struct {
+	ID          int64        `db:"id" json:"id"`
+	Name        string       `db:"name" json:"name"`
+	Description string       `db:"description" json:"description"`
+	CreatedAt   sql.NullTime `db:"created_at" json:"created_at"`
+}
+
 type RefreshToken struct {
 	ID        int64        `db:"id" json:"id"`
 	UserID    int64        `db:"user_id" json:"user_id"`
@@ -52,6 +59,18 @@ type RefreshToken struct {
 	CreatedAt sql.NullTime `db:"created_at" json:"created_at"`
 }
 
+type Role struct {
+	ID          int64        `db:"id" json:"id"`
+	Name        string       `db:"name" json:"name"`
+	Description string       `db:"description" json:"description"`
+	CreatedAt   sql.NullTime `db:"created_at" json:"created_at"`
+}
+
+type RolePermission struct {
+	RoleID       int64 `db:"role_id" json:"role_id"`
+	PermissionID int64 `db:"permission_id" json:"permission_id"`
+}
+
 type User struct {
 	ID        int64        `db:"id" json:"id"`
 	Level     int32        `db:"level" json:"level"`
@@ -59,6 +78,11 @@ type User struct {
 	Password  string       `db:"password" json:"password"`
 	CreatedAt sql.NullTime `db:"created_at" json:"created_at"`
 	UpdatedAt sql.NullTime `db:"updated_at" json:"updated_at"`
+}
+
+type UserRole struct {
+	UserID int64 `db:"user_id" json:"user_id"`
+	RoleID int64 `db:"role_id" json:"role_id"`
 }
 
 type Withdrawal struct {

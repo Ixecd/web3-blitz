@@ -125,7 +125,7 @@ func main() {
 
 	// h := api.NewHandler(btcWallet, ethWallet, queries, redisClient)
 	h := api.NewHandler(btcWallet, ethWallet, queries, locker, jwtSecret)
-	mux := api.NewMux(h, jwtSecret)
+	mux := api.NewMux(h, jwtSecret, queries)
 
 	go confirmChecker.Start(ctx)
 	// 开始扫块

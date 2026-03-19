@@ -12,6 +12,22 @@ import (
 	"time"
 )
 
+const assignRoleToUser = `-- name: AssignRoleToUser :exec
+INSERT INTO user_roles (user_id, role_id)
+VALUES ($1, $2)
+ON CONFLICT DO NOTHING
+`
+
+type AssignRoleToUserParams struct {
+	UserID int64 `db:"user_id" json:"user_id"`
+	RoleID int64 `db:"role_id" json:"role_id"`
+}
+
+func (q *Queries) AssignRoleToUser(ctx context.Context, arg AssignRoleToUserParams) error {
+	_, err := q.db.ExecContext(ctx, assignRoleToUser, arg.UserID, arg.RoleID)
+	return err
+}
+
 const createDeadLetter = `-- name: CreateDeadLetter :exec
 INSERT INTO dead_letters (type, payload, error, retries)
 VALUES ($1, $2, $3, $4)
@@ -266,6 +282,56 @@ func (q *Queries) GetRefreshToken(ctx context.Context, token string) (RefreshTok
 	return i, err
 }
 
+const getRoleByName = `-- name: GetRoleByName :one
+SELECT id, name, description, created_at FROM roles WHERE name = $1 LIMIT 1
+`
+
+func (q *Queries) GetRoleByName(ctx context.Context, name string) (Role, error) {
+	row := q.db.QueryRowContext(ctx, getRoleByName, name)
+	var i Role
+	err := row.Scan(
+		&i.ID,
+		&i.Name,
+		&i.Description,
+		&i.CreatedAt,
+	)
+	return i, err
+}
+
+const getRolePermissions = `-- name: GetRolePermissions :many
+SELECT p.id, p.name, p.description, p.created_at FROM permissions p
+JOIN role_permissions rp ON rp.permission_id = p.id
+WHERE rp.role_id = $1
+`
+
+func (q *Queries) GetRolePermissions(ctx context.Context, roleID int64) ([]Permission, error) {
+	rows, err := q.db.QueryContext(ctx, getRolePermissions, roleID)
+	if err != nil {
+		return nil, err
+	}
+	defer rows.Close()
+	var items []Permission
+	for rows.Next() {
+		var i Permission
+		if err := rows.Scan(
+			&i.ID,
+			&i.Name,
+			&i.Description,
+			&i.CreatedAt,
+		); err != nil {
+			return nil, err
+		}
+		items = append(items, i)
+	}
+	if err := rows.Close(); err != nil {
+		return nil, err
+	}
+	if err := rows.Err(); err != nil {
+		return nil, err
+	}
+	return items, nil
+}
+
 const getTotalDepositByChain = `-- name: GetTotalDepositByChain :one
 SELECT COALESCE(SUM(amount), 0) as total
 FROM deposits
@@ -360,6 +426,70 @@ func (q *Queries) GetUserLevel(ctx context.Context, id int64) (int32, error) {
 	var level int32
 	err := row.Scan(&level)
 	return level, err
+}
+
+const getUserPermissions = `-- name: GetUserPermissions :many
+SELECT DISTINCT p.name FROM permissions p
+JOIN role_permissions rp ON rp.permission_id = p.id
+JOIN user_roles ur ON ur.role_id = rp.role_id
+WHERE ur.user_id = $1
+`
+
+func (q *Queries) GetUserPermissions(ctx context.Context, userID int64) ([]string, error) {
+	rows, err := q.db.QueryContext(ctx, getUserPermissions, userID)
+	if err != nil {
+		return nil, err
+	}
+	defer rows.Close()
+	var items []string
+	for rows.Next() {
+		var name string
+		if err := rows.Scan(&name); err != nil {
+			return nil, err
+		}
+		items = append(items, name)
+	}
+	if err := rows.Close(); err != nil {
+		return nil, err
+	}
+	if err := rows.Err(); err != nil {
+		return nil, err
+	}
+	return items, nil
+}
+
+const getUserRoles = `-- name: GetUserRoles :many
+SELECT r.id, r.name, r.description, r.created_at FROM roles r
+JOIN user_roles ur ON ur.role_id = r.id
+WHERE ur.user_id = $1
+`
+
+func (q *Queries) GetUserRoles(ctx context.Context, userID int64) ([]Role, error) {
+	rows, err := q.db.QueryContext(ctx, getUserRoles, userID)
+	if err != nil {
+		return nil, err
+	}
+	defer rows.Close()
+	var items []Role
+	for rows.Next() {
+		var i Role
+		if err := rows.Scan(
+			&i.ID,
+			&i.Name,
+			&i.Description,
+			&i.CreatedAt,
+		); err != nil {
+			return nil, err
+		}
+		items = append(items, i)
+	}
+	if err := rows.Close(); err != nil {
+		return nil, err
+	}
+	if err := rows.Err(); err != nil {
+		return nil, err
+	}
+	return items, nil
 }
 
 const getWithdrawalLimit = `-- name: GetWithdrawalLimit :one
@@ -603,6 +733,82 @@ func (q *Queries) ListUnresolvedDeadLetters(ctx context.Context) ([]DeadLetter, 
 	return items, nil
 }
 
+const listUsers = `-- name: ListUsers :many
+SELECT id, level, username, created_at, updated_at FROM users ORDER BY created_at DESC
+`
+
+type ListUsersRow struct {
+	ID        int64        `db:"id" json:"id"`
+	Level     int32        `db:"level" json:"level"`
+	Username  string       `db:"username" json:"username"`
+	CreatedAt sql.NullTime `db:"created_at" json:"created_at"`
+	UpdatedAt sql.NullTime `db:"updated_at" json:"updated_at"`
+}
+
+func (q *Queries) ListUsers(ctx context.Context) ([]ListUsersRow, error) {
+	rows, err := q.db.QueryContext(ctx, listUsers)
+	if err != nil {
+		return nil, err
+	}
+	defer rows.Close()
+	var items []ListUsersRow
+	for rows.Next() {
+		var i ListUsersRow
+		if err := rows.Scan(
+			&i.ID,
+			&i.Level,
+			&i.Username,
+			&i.CreatedAt,
+			&i.UpdatedAt,
+		); err != nil {
+			return nil, err
+		}
+		items = append(items, i)
+	}
+	if err := rows.Close(); err != nil {
+		return nil, err
+	}
+	if err := rows.Err(); err != nil {
+		return nil, err
+	}
+	return items, nil
+}
+
+const listWithdrawalLimits = `-- name: ListWithdrawalLimits :many
+SELECT id, level, level_name, btc_daily, eth_daily, min_deposit, created_at FROM withdrawal_limits ORDER BY level ASC
+`
+
+func (q *Queries) ListWithdrawalLimits(ctx context.Context) ([]WithdrawalLimit, error) {
+	rows, err := q.db.QueryContext(ctx, listWithdrawalLimits)
+	if err != nil {
+		return nil, err
+	}
+	defer rows.Close()
+	var items []WithdrawalLimit
+	for rows.Next() {
+		var i WithdrawalLimit
+		if err := rows.Scan(
+			&i.ID,
+			&i.Level,
+			&i.LevelName,
+			&i.BtcDaily,
+			&i.EthDaily,
+			&i.MinDeposit,
+			&i.CreatedAt,
+		); err != nil {
+			return nil, err
+		}
+		items = append(items, i)
+	}
+	if err := rows.Close(); err != nil {
+		return nil, err
+	}
+	if err := rows.Err(); err != nil {
+		return nil, err
+	}
+	return items, nil
+}
+
 const listWithdrawalsByUserID = `-- name: ListWithdrawalsByUserID :many
 SELECT id, tx_id, address, user_id, amount, fee, status, chain, created_at, updated_at FROM withdrawals WHERE user_id = $1 ORDER BY created_at DESC
 `
@@ -639,6 +845,20 @@ func (q *Queries) ListWithdrawalsByUserID(ctx context.Context, userID string) ([
 		return nil, err
 	}
 	return items, nil
+}
+
+const removeRoleFromUser = `-- name: RemoveRoleFromUser :exec
+DELETE FROM user_roles WHERE user_id = $1 AND role_id = $2
+`
+
+type RemoveRoleFromUserParams struct {
+	UserID int64 `db:"user_id" json:"user_id"`
+	RoleID int64 `db:"role_id" json:"role_id"`
+}
+
+func (q *Queries) RemoveRoleFromUser(ctx context.Context, arg RemoveRoleFromUserParams) error {
+	_, err := q.db.ExecContext(ctx, removeRoleFromUser, arg.UserID, arg.RoleID)
+	return err
 }
 
 const resolveDeadLetter = `-- name: ResolveDeadLetter :exec
@@ -696,6 +916,23 @@ type UpdateUserLevelParams struct {
 
 func (q *Queries) UpdateUserLevel(ctx context.Context, arg UpdateUserLevelParams) error {
 	_, err := q.db.ExecContext(ctx, updateUserLevel, arg.Level, arg.ID)
+	return err
+}
+
+const updateWithdrawalLimit = `-- name: UpdateWithdrawalLimit :exec
+UPDATE withdrawal_limits
+SET btc_daily = $1, eth_daily = $2
+WHERE level = $3
+`
+
+type UpdateWithdrawalLimitParams struct {
+	BtcDaily string `db:"btc_daily" json:"btc_daily"`
+	EthDaily string `db:"eth_daily" json:"eth_daily"`
+	Level    int32  `db:"level" json:"level"`
+}
+
+func (q *Queries) UpdateWithdrawalLimit(ctx context.Context, arg UpdateWithdrawalLimitParams) error {
+	_, err := q.db.ExecContext(ctx, updateWithdrawalLimit, arg.BtcDaily, arg.EthDaily, arg.Level)
 	return err
 }
 

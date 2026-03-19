@@ -71,3 +71,33 @@ CREATE TABLE IF NOT EXISTS dead_letters (
     created_at TIMESTAMPTZ DEFAULT NOW(),
     updated_at TIMESTAMPTZ DEFAULT NOW()
 );
+
+-- 角色表
+CREATE TABLE IF NOT EXISTS roles (
+    id          BIGSERIAL PRIMARY KEY,
+    name        TEXT NOT NULL UNIQUE,  -- admin / operator / user
+    description TEXT NOT NULL DEFAULT '',
+    created_at  TIMESTAMPTZ DEFAULT NOW()
+);
+
+-- 权限表
+CREATE TABLE IF NOT EXISTS permissions (
+    id          BIGSERIAL PRIMARY KEY,
+    name        TEXT NOT NULL UNIQUE,  -- user:read / user:upgrade / limit:write 等
+    description TEXT NOT NULL DEFAULT '',
+    created_at  TIMESTAMPTZ DEFAULT NOW()
+);
+
+-- 角色-权限关联
+CREATE TABLE IF NOT EXISTS role_permissions (
+    role_id       BIGINT NOT NULL REFERENCES roles(id),
+    permission_id BIGINT NOT NULL REFERENCES permissions(id),
+    PRIMARY KEY (role_id, permission_id)
+);
+
+-- 用户-角色关联
+CREATE TABLE IF NOT EXISTS user_roles (
+    user_id BIGINT NOT NULL REFERENCES users(id),
+    role_id BIGINT NOT NULL REFERENCES roles(id),
+    PRIMARY KEY (user_id, role_id)
+);

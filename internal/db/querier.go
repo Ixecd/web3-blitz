@@ -9,6 +9,7 @@ import (
 )
 
 type Querier interface {
+	AssignRoleToUser(ctx context.Context, arg AssignRoleToUserParams) error
 	CreateDeadLetter(ctx context.Context, arg CreateDeadLetterParams) error
 	CreateDeposit(ctx context.Context, arg CreateDepositParams) error
 	CreateDepositAddress(ctx context.Context, arg CreateDepositAddressParams) error
@@ -20,12 +21,16 @@ type Querier interface {
 	GetDepositByTxID(ctx context.Context, txID string) (Deposit, error)
 	GetLast24hWithdrawalByUserAndChain(ctx context.Context, arg GetLast24hWithdrawalByUserAndChainParams) (interface{}, error)
 	GetRefreshToken(ctx context.Context, token string) (RefreshToken, error)
+	GetRoleByName(ctx context.Context, name string) (Role, error)
+	GetRolePermissions(ctx context.Context, roleID int64) ([]Permission, error)
 	GetTotalDepositByChain(ctx context.Context, chain string) (interface{}, error)
 	GetTotalDepositByUserIDAndChain(ctx context.Context, arg GetTotalDepositByUserIDAndChainParams) (interface{}, error)
 	GetTotalWithdrawalByUserIDAndChain(ctx context.Context, arg GetTotalWithdrawalByUserIDAndChainParams) (interface{}, error)
 	GetUserByID(ctx context.Context, id int64) (User, error)
 	GetUserByUsername(ctx context.Context, username string) (User, error)
 	GetUserLevel(ctx context.Context, id int64) (int32, error)
+	GetUserPermissions(ctx context.Context, userID int64) ([]string, error)
+	GetUserRoles(ctx context.Context, userID int64) ([]Role, error)
 	GetWithdrawalLimit(ctx context.Context, level int32) (WithdrawalLimit, error)
 	ListAddressesByUserID(ctx context.Context, userID string) ([]DepositAddress, error)
 	ListAllDepositAddresses(ctx context.Context) ([]DepositAddress, error)
@@ -33,12 +38,16 @@ type Querier interface {
 	ListDepositsByUserID(ctx context.Context, userID string) ([]Deposit, error)
 	ListUnconfirmedDeposits(ctx context.Context) ([]Deposit, error)
 	ListUnresolvedDeadLetters(ctx context.Context) ([]DeadLetter, error)
+	ListUsers(ctx context.Context) ([]ListUsersRow, error)
+	ListWithdrawalLimits(ctx context.Context) ([]WithdrawalLimit, error)
 	ListWithdrawalsByUserID(ctx context.Context, userID string) ([]Withdrawal, error)
+	RemoveRoleFromUser(ctx context.Context, arg RemoveRoleFromUserParams) error
 	ResolveDeadLetter(ctx context.Context, id int64) error
 	RevokeAllUserRefreshTokens(ctx context.Context, userID int64) error
 	RevokeRefreshToken(ctx context.Context, token string) error
 	UpdateDepositConfirmed(ctx context.Context, id int64) error
 	UpdateUserLevel(ctx context.Context, arg UpdateUserLevelParams) error
+	UpdateWithdrawalLimit(ctx context.Context, arg UpdateWithdrawalLimitParams) error
 	UpdateWithdrawalTx(ctx context.Context, arg UpdateWithdrawalTxParams) error
 }
 

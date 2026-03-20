@@ -1,7 +1,7 @@
 # web3-blitz 项目快照
 
 > 用途：新会话开始时直接把这个文件扔给 Claude，5秒对齐，继续工作。
-> 最后更新：2026-03-19
+> 最后更新：2026-03-20
 
 ---
 
@@ -12,7 +12,7 @@ Go + 云原生的交易所钱包充提币系统，目标是生产可用的完整
 
 ---
 
-## 当前版本：v0.1.1
+## 当前版本：v0.1.2
 
 ### 已完成功能全览
 
@@ -43,23 +43,21 @@ Go + 云原生的交易所钱包充提币系统，目标是生产可用的完整
 - 统一错误码系统（100xxx通用/101xxx用户/102xxx钱包）
 - 统一响应格式（OK/Fail/FailMsg）
 
-**监控：**
+**监控（v0.1.2 完整落地）：**
 - Prometheus 自定义业务指标（internal/metrics/metrics.go）
-- blitz_deposit_total（chain, status: detected/confirmed）
-- blitz_deposit_amount_total（chain）
-- blitz_withdraw_total（chain, status: completed/failed）
-- blitz_withdraw_amount_total（chain）
-- blitz_dead_letter_total（type）
-- blitz_reorg_total（chain）
-- blitz_lock_acquire_fail_total（key）
+  - blitz_deposit_total（chain, status: detected/confirmed）
+  - blitz_deposit_amount_total（chain）
+  - blitz_withdraw_total（chain, status: completed/failed）
+  - blitz_withdraw_amount_total（chain）
+  - blitz_dead_letter_total（type）
+  - blitz_reorg_total（chain）
+  - blitz_lock_acquire_fail_total（key）
+- prometheus.yml：4个 scrape job（prometheus/etcd/blitz-wallet/wallet-service）
+- 告警规则 6条（monitoring/prometheus/rules/blitz.yml）
+- Alertmanager Telegram 告警（routing + 12h repeat_interval）
+- Grafana dashboard（9个 Panel，monitoring/grafana/dashboards/blitz.json）
 - Swagger 2.0 API 文档（docs/swagger.yaml）
 - GitHub Actions CI（build + vet + test + docker build）
-- Prometheus metrics + K8s Helm 部署
-
-**待补全的监控：**
-- prometheus.yml 还未加 wallet-service scraping（本地 Homebrew Prometheus）
-- Alertmanager 配置（Telegram 告警）
-- Grafana dashboard JSON
 
 ---
 
@@ -142,15 +140,25 @@ internal/
 ├── config/rpc.go, watcher.go
 ├── db/schema.sql, seed.sql, queries.sql, connect.go
 ├── lock/lock.go
-├── metrics/metrics.go          # 自定义 Prometheus 指标
+├── metrics/metrics.go
 ├── pkg/code/code.go, code_generated.go
 ├── wallet/btc/, eth/, core/, types/
-cmd/wallet-service/main.go      # consumeDeposits 含重试+死信+metrics埋点
+cmd/wallet-service/main.go
 docs/
 ├── swagger.yaml
 ├── design/wallet-core.md, etcd-architecture.md, rbac.md, error-code.md, dead-letter.md
-└── guide/zh-CN/（多个指南文档）
+└── guide/zh-CN/
+monitoring/
+├── README.md
+├── prometheus/
+│   ├── prometheus.yml
+│   └── rules/blitz.yml
+├── alertmanager/
+│   └── alertmanager.yml.example    # 真实配置在 .gitignore
+└── grafana/
+    └── dashboards/blitz.json
 .github/workflows/ci.yml
+snapshots/
 ```
 
 ---
@@ -169,17 +177,26 @@ go run cmd/wallet-service/main.go
 
 ## 监控现状
 
-**本地 Prometheus（Homebrew）配置：**
-- job: prometheus（自身）
-- job: etcd（localhost:2379）
-- job: bitcoin-regtest-miner → 待改名为 blitz-wallet（localhost:2112）
-- ❌ 待加：wallet-service（localhost:2113）
+**本地 Prometheus（Homebrew）：**
+- 配置路径：`/opt/homebrew/etc/prometheus/`
+- rule_files：`/opt/homebrew/etc/prometheus/rules/*.yml`
 
-**待完成：**
-1. prometheus.yml 加 wallet-service scraping
-2. miner job name 改为 blitz-wallet
-3. Alertmanager 安装配置（Telegram 通知）
-4. Grafana dashboard JSON 导出/导入
+**scrape jobs：**
+
+| job | target | 状态 |
+|-----|--------|------|
+| prometheus | localhost:9090 | ✅ |
+| etcd | localhost:2379 | ✅ |
+| blitz-wallet | localhost:2112 | ✅ |
+| wallet-service | localhost:2113 | ✅ |
+
+**Alertmanager（Homebrew）：**
+- 配置路径：`~/.config/alertmanager/alertmanager.yml`
+- Telegram bot 已接通，测试告警验证通过
+
+**Grafana：**
+- dashboard 已导入：`monitoring/grafana/dashboards/blitz.json`
+- 9个 Panel，默认时间范围 3h，30s 自动刷新
 
 ---
 
@@ -196,15 +213,14 @@ go run cmd/wallet-service/main.go
 
 ## 待实现（按优先级）
 
-1. **监控告警补全**（prometheus.yml + Alertmanager + Telegram + Grafana JSON）
-2. **前端**（React + Vite + Tailwind + shadcn/ui，审美要求极高）
-3. **主网切换 + 冷热钱包分离**
-4. **完整 IAM 补全**（角色分配接口、审计日志、黑名单 token）
-5. **user_id 统一**（TEXT → BIGINT，解锁 checkAndUpgradeLevel）
-6. **ETH reorg 数据库回滚**
-7. **死信队列定时重试 + 管理接口**
-8. **多链扩展**（TRON/SOL/Polygon）
-9. **dev-toolkit metrics 骨架**
+1. **前端**（React + Vite + Tailwind + shadcn/ui，审美要求极高）
+2. **主网切换 + 冷热钱包分离**
+3. **完整 IAM 补全**（角色分配接口、审计日志、黑名单 token）
+4. **user_id 统一**（TEXT → BIGINT，解锁 checkAndUpgradeLevel）
+5. **ETH reorg 数据库回滚**
+6. **死信队列定时重试 + 管理接口**
+7. **多链扩展**（TRON/SOL/Polygon）
+8. **dev-toolkit metrics 骨架**
 
 ---
 
@@ -218,6 +234,7 @@ go run cmd/wallet-service/main.go
 - ETH reorg：ParentHash 校验，不匹配回退 lastHeight/lastHash
 - metrics 埋点：detected/confirmed 分开计数，lock fail 在获取失败时计
 - e2e/smoke 加 `//go:build e2e`，CI 只跑 integration
+- alertmanager.yml 含敏感信息，加入 .gitignore，项目保留 .example
 
 ---
 
@@ -244,5 +261,6 @@ snapshots/
 ├── SNAPSHOT-web3blitz-2026-03-18-etcd.md
 ├── SNAPSHOT-web3blitz-2026-03-19-auth-limits.md
 ├── SNAPSHOT-web3blitz-2026-03-19-rbac-swagger.md
-└── SNAPSHOT-web3blitz-2026-03-19-metrics.md
+├── SNAPSHOT-web3blitz-2026-03-19-metrics.md
+└── SNAPSHOT-web3blitz-2026-03-20-monitoring.md
 ```

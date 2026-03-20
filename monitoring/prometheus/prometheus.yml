@@ -1,0 +1,53 @@
+global:
+  scrape_interval:     15s
+  evaluation_interval: 15s
+
+# 本地部署说明：
+# Homebrew Prometheus 需将 rule_files 改为绝对路径：
+#   /opt/homebrew/etc/prometheus/rules/*.yml
+# Docker/K8s 部署则挂载到容器内对应路径即可
+rule_files:
+  - rules/*.yml
+
+alerting:
+  alertmanagers:
+    - static_configs:
+        - targets: ['localhost:9093']
+
+scrape_configs:
+  - job_name: 'prometheus'
+    static_configs:
+      - targets: ['localhost:9090']
+
+  - job_name: 'etcd'
+    metrics_path: '/metrics'
+    static_configs:
+      - targets: ['localhost:2379']
+    relabel_configs:
+      - target_label: cluster
+        replacement: 'local-dev'
+    metric_relabel_configs:
+      - source_labels: [__name__]
+        regex: 'etcd_disk_wal_fsync_duration_seconds_bucket|etcd_mvcc_db_total_size_in_bytes|etcd_server_proposals_committed_total'
+        action: keep
+
+  # regtest miner（本地开发环境）
+  - job_name: 'blitz-wallet'
+    scrape_interval: 10s
+    metrics_path: '/metrics'
+    honor_timestamps: true
+    static_configs:
+      - targets: ['localhost:2112']
+        labels:
+          instance:    "mac-mini-regtest"
+          environment: "regtest"
+          role:        "miner"
+
+  - job_name: 'wallet-service'
+    scrape_interval: 10s
+    metrics_path: '/metrics'
+    static_configs:
+      - targets: ['localhost:2113']
+        labels:
+          environment: "local-dev"
+          service:     "wallet-service"

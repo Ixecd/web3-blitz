@@ -1,0 +1,68 @@
+groups:
+  - name: blitz-wallet
+    rules:
+      # 提币广播失败
+      - alert: WithdrawBroadcastFailed
+        expr: increase(blitz_withdraw_total{status="failed"}[5m]) > 0
+        for: 1m
+        labels:
+          severity: critical
+          service: wallet-service
+        annotations:
+          summary: "提币广播失败"
+          description: "过去5分钟有提币广播失败，请立即检查热钱包余额和 RPC 连接"
+
+      # 死信队列有新记录
+      - alert: DeadLetterQueued
+        expr: increase(blitz_dead_letter_total[5m]) > 0
+        for: 1m
+        labels:
+          severity: warning
+          service: wallet-service
+        annotations:
+          summary: "死信队列有新记录"
+          description: "充值记录写入失败进入死信队列，请检查数据库连接"
+
+      # ETH reorg 检测
+      - alert: ETHReorgDetected
+        expr: increase(blitz_reorg_total{chain="eth"}[10m]) > 0
+        for: 0m
+        labels:
+          severity: warning
+          service: wallet-service
+        annotations:
+          summary: "ETH 链重组检测"
+          description: "检测到 ETH 链重组，Watcher 已自动回退重扫，请关注后续确认情况"
+
+      # 分布式锁获取失败过多（重复提币请求异常）
+      - alert: LockAcquireFailSpike
+        expr: increase(blitz_lock_acquire_fail_total[5m]) > 10
+        for: 2m
+        labels:
+          severity: warning
+          service: wallet-service
+        annotations:
+          summary: "分布式锁获取失败激增"
+          description: "5分钟内锁获取失败超过10次，可能存在异常重复提币请求"
+
+      # wallet-service 服务不可达
+      - alert: WalletServiceDown
+        expr: up{job="wallet-service"} == 0
+        for: 1m
+        labels:
+          severity: critical
+          service: wallet-service
+        annotations:
+          summary: "wallet-service 不可达"
+          description: "wallet-service 已停止响应，请立即检查"
+
+      # etcd 不可达
+      - alert: EtcdDown
+        expr: up{job="etcd"} == 0
+        for: 1m
+        labels:
+          severity: critical
+          service: etcd
+        annotations:
+          summary: "etcd 不可达"
+          description: "etcd 已停止响应，分布式锁和选主功能将失效"

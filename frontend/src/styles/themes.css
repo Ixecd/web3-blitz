@@ -1,0 +1,153 @@
+/* ============================================================
+   web3-blitz 主题系统
+   骨架：黑/白/灰 统一
+   各主题只改 --accent-* 和 --surface-* 层
+   ============================================================ */
+
+/* ── 默认（Void · 深紫）────────────────────────────────── */
+:root,
+[data-theme="void"] {
+  /* surfaces */
+  --color-base:    #07070f;
+  --color-surface: #0d0d1a;
+  --color-raised:  #121224;
+  --color-overlay: #1a1a30;
+
+  /* borders */
+  --color-border:        #1e1e35;
+  --color-border-strong: #2e2e50;
+
+  /* accent — 深紫，再压一档，收着不外露 */
+  --color-accent:         #5b21b6;
+  --color-accent-dim:     #5b21b660;
+  --color-accent-muted:   #5b21b615;
+  --color-accent-glow:    #5b21b625;
+
+  /* grid — 暗色主题用白色线，不跟 accent 走 */
+  --color-grid: #ffffff;
+
+  /* text */
+  --color-text-primary:  #f0eeff;
+  --color-text-muted:    #6b6b8a;
+  --color-text-faint:    #3a3a52;
+
+  /* semantic */
+  --color-success: #10b981;
+  --color-danger:  #ef4444;
+  --color-warning: #f59e0b;
+
+  /* radius — 收紧，更硬朗 */
+  --radius: 0.375rem;
+}
+
+/* ── Glacier · 天蓝 ─────────────────────────────────────── */
+[data-theme="glacier"] {
+  --color-base:    #f8fafb;
+  --color-surface: #ffffff;
+  --color-raised:  #f1f5f9;
+  --color-overlay: #e8f0f7;
+
+  --color-border:        #dde5ee;
+  --color-border-strong: #b8c9db;
+
+  --color-accent:       #0ea5e9;
+  --color-accent-dim:   #0ea5e960;
+  --color-accent-muted: #0ea5e912;
+  --color-accent-glow:  #0ea5e928;
+
+  --color-grid: #0ea5e9;
+
+  --color-text-primary: #0f172a;
+  --color-text-muted:   #64748b;
+  --color-text-faint:   #b0bec5;
+
+  --color-success: #059669;
+  --color-danger:  #dc2626;
+  --color-warning: #d97706;
+
+  --radius: 0.375rem;
+}
+
+/* ── Grove · 深绿 ───────────────────────────────────────── */
+[data-theme="grove"] {
+  --color-base:    #080f0a;
+  --color-surface: #0d1710;
+  --color-raised:  #111f15;
+  --color-overlay: #172819;
+
+  --color-border:        #1c2e20;
+  --color-border-strong: #2a4230;
+
+  --color-accent:       #16a34a;
+  --color-accent-dim:   #16a34a60;
+  --color-accent-muted: #16a34a18;
+  --color-accent-glow:  #16a34a30;
+
+  --color-grid: #ffffff;
+
+  --color-text-primary: #edfff2;
+  --color-text-muted:   #5a7a62;
+  --color-text-faint:   #2e4232;
+
+  --color-success: #22c55e;
+  --color-danger:  #ef4444;
+  --color-warning: #f59e0b;
+
+  --radius: 0.375rem;
+}
+
+/* ── Ember · 橙 ─────────────────────────────────────────── */
+[data-theme="ember"] {
+  --color-base:    #faf8f5;
+  --color-surface: #ffffff;
+  --color-raised:  #fdf4ec;
+  --color-overlay: #fce8d5;
+
+  --color-border:        #edddd0;
+  --color-border-strong: #d9bfa8;
+
+  --color-accent:       #ea580c;
+  --color-accent-dim:   #ea580c60;
+  --color-accent-muted: #ea580c12;
+  --color-accent-glow:  #ea580c28;
+
+  --color-grid: #ea580c;
+
+  --color-text-primary: #1c0f05;
+  --color-text-muted:   #78503a;
+  --color-text-faint:   #c4a090;
+
+  --color-success: #16a34a;
+  --color-danger:  #dc2626;
+  --color-warning: #b45309;
+
+  --radius: 0.375rem;
+}
+
+/* ── Aurum · 奢雅黄 ─────────────────────────────────────── */
+[data-theme="aurum"] {
+  --color-base:    #09080a;
+  --color-surface: #100e12;
+  --color-raised:  #161318;
+  --color-overlay: #1e1a22;
+
+  --color-border:        #211d25;
+  --color-border-strong: #332d3a;
+
+  --color-accent:       #c9962a;
+  --color-accent-dim:   #c9962a60;
+  --color-accent-muted: #c9962a18;
+  --color-accent-glow:  #c9962a30;
+
+  --color-grid: #ffffff;
+
+  --color-text-primary: #fff8e8;
+  --color-text-muted:   #7a6a50;
+  --color-text-faint:   #3d3228;
+
+  --color-success: #10b981;
+  --color-danger:  #ef4444;
+  --color-warning: #f59e0b;
+
+  --radius: 0.375rem;
+}

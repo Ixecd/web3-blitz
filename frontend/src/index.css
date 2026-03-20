@@ -1,0 +1,115 @@
+@import './styles/themes.css';
+
+@tailwind base;
+@tailwind components;
+@tailwind utilities;
+
+@layer base {
+  * {
+    border-color: var(--color-border);
+    box-sizing: border-box;
+  }
+
+  html {
+    background-color: var(--color-base);
+    color: var(--color-text-primary);
+    font-family: 'DM Sans', sans-serif;
+    -webkit-font-smoothing: antialiased;
+  }
+
+  ::-webkit-scrollbar        { width: 4px; height: 4px; }
+  ::-webkit-scrollbar-track  { background: transparent; }
+  ::-webkit-scrollbar-thumb  { background: var(--color-border-strong); border-radius: 9999px; }
+
+  ::selection { background: var(--color-accent-muted); }
+}
+
+@layer components {
+
+  /* ── Card ── */
+  .card {
+    @apply rounded-xl border;
+    background-color: var(--color-surface);
+    border-color: var(--color-border);
+    box-shadow: 0 1px 3px #00000040, 0 0 0 1px var(--color-border);
+  }
+
+  /* ── Input ── */
+  .input {
+    @apply w-full rounded-lg px-3 py-2.5 font-mono text-sm outline-none transition-all duration-150;
+    background-color: var(--color-raised);
+    border: 1px solid var(--color-border);
+    color: var(--color-text-primary);
+  }
+  .input::placeholder { color: var(--color-text-faint); }
+  .input:focus {
+    border-color: var(--color-accent);
+    box-shadow: 0 0 0 3px var(--color-accent-muted);
+  }
+
+  /* ── Button primary ── */
+  .btn-primary {
+    @apply rounded-lg px-4 py-2.5 font-display font-semibold text-sm
+           transition-all duration-150 active:scale-95
+           disabled:opacity-40 disabled:cursor-not-allowed;
+    background-color: var(--color-accent);
+    color: var(--color-base);
+  }
+  .btn-primary:hover:not(:disabled) {
+    filter: brightness(1.12);
+    box-shadow: 0 0 16px var(--color-accent-glow);
+  }
+
+  /* ── Button ghost ── */
+  .btn-ghost {
+    @apply rounded-lg px-3 py-2 text-sm transition-colors duration-150;
+    color: var(--color-text-muted);
+  }
+  .btn-ghost:hover {
+    background-color: var(--color-raised);
+    color: var(--color-text-primary);
+  }
+
+  /* ── Chain pill ── */
+  .chain-pill {
+    @apply flex-1 rounded-lg border py-2 text-sm font-mono font-medium
+           transition-all duration-150 text-center;
+  }
+  .chain-pill-active {
+    background-color: var(--color-accent);
+    border-color: var(--color-accent);
+    color: var(--color-base);
+  }
+  .chain-pill-inactive {
+    border-color: var(--color-border);
+    color: var(--color-text-muted);
+  }
+  .chain-pill-inactive:hover {
+    border-color: var(--color-border-strong);
+    color: var(--color-text-primary);
+  }
+
+  /* ── Table ── */
+  .data-table          { @apply w-full text-sm border-collapse; }
+  .data-table th       {
+    @apply px-4 py-3 text-left text-xs font-mono font-medium uppercase tracking-widest;
+    color: var(--color-text-faint);
+    border-bottom: 1px solid var(--color-border);
+  }
+  .data-table td       {
+    @apply px-4 py-3 font-mono text-xs;
+    color: var(--color-text-primary);
+    border-bottom: 1px solid var(--color-border);
+  }
+  .data-table tr:last-child td { border-bottom: none; }
+  .data-table tbody tr         { transition: background-color 0.1s; }
+  .data-table tbody tr:hover   { background-color: var(--color-raised); }
+
+  /* ── Badge ── */
+  .badge         { @apply inline-flex items-center gap-1 rounded-full px-2 py-0.5 text-xs font-mono; }
+  .badge-success { background-color: color-mix(in srgb, var(--color-success) 12%, transparent); color: var(--color-success); }
+  .badge-danger  { background-color: color-mix(in srgb, var(--color-danger)  12%, transparent); color: var(--color-danger);  }
+  .badge-warning { background-color: color-mix(in srgb, var(--color-warning) 12%, transparent); color: var(--color-warning); }
+  .badge-muted   { background-color: var(--color-raised); color: var(--color-text-muted); }
+  .badge-accent  { background-color: var(--color-accent-muted); color: var(--color-accent); }
+}

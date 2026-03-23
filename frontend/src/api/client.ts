@@ -8,7 +8,8 @@ export class ApiError extends Error {
 }
 
 async function request<T>(path: string, options: RequestInit = {}): Promise<T> {
-  const token = localStorage.getItem('access_token')
+  // 优先 localStorage（记住我），其次 sessionStorage（会话级）
+  const token = localStorage.getItem('access_token') ?? sessionStorage.getItem('access_token')
   const headers: Record<string, string> = {
     'Content-Type': 'application/json',
     ...(options.headers as Record<string, string>),
@@ -26,7 +27,7 @@ async function request<T>(path: string, options: RequestInit = {}): Promise<T> {
 
 export const api = {
   get:    <T>(path: string)                => request<T>(path, { method: 'GET' }),
-  post:   <T>(path: string, body: unknown) => request<T>(path, { method: 'POST',  body: JSON.stringify(body) }),
-  put:    <T>(path: string, body: unknown) => request<T>(path, { method: 'PUT',   body: JSON.stringify(body) }),
+  post:   <T>(path: string, body: unknown) => request<T>(path, { method: 'POST',   body: JSON.stringify(body) }),
+  put:    <T>(path: string, body: unknown) => request<T>(path, { method: 'PUT',    body: JSON.stringify(body) }),
   delete: <T>(path: string)               => request<T>(path, { method: 'DELETE' }),
 }

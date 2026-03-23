@@ -4,17 +4,21 @@ import (
 	"context"
 	"encoding/json"
 	"fmt"
-	"log"
+	"log/slog"
 	"net/http"
 	"os"
 	"os/signal"
 	"syscall"
 	"time"
 
+	"github.com/joho/godotenv"
+
 	"github.com/Ixecd/web3-blitz/internal/api"
 	"github.com/Ixecd/web3-blitz/internal/config"
 	"github.com/Ixecd/web3-blitz/internal/db"
+	"github.com/Ixecd/web3-blitz/internal/email"
 	"github.com/Ixecd/web3-blitz/internal/lock"
+	"github.com/Ixecd/web3-blitz/internal/logger"
 	"github.com/Ixecd/web3-blitz/internal/metrics"
 	"github.com/Ixecd/web3-blitz/internal/wallet/btc"
 	"github.com/Ixecd/web3-blitz/internal/wallet/core"
@@ -27,26 +31,32 @@ import (
 )
 
 func main() {
-	// 生命周期控制，最先创建
+	godotenv.Load()
+
+	// 最先初始化日志，后续所有 slog 调用才能正确路由
+	logger.Init()
+
+	// 生命周期控制
 	ctx, cancel := context.WithCancel(context.Background())
 	metrics.Init()
 
 	// 密钥体系，其他所有钱包操作的根基
 	hdWallet, err := core.NewHDWallet()
 	if err != nil {
-		log.Fatal("HDWallet 初始化失败:", err)
+		slog.Error("HDWallet 初始化失败", "err", err)
+		os.Exit(1)
 	}
 
-	// 持久层，基础设施
+	// 持久层
 	database, err := db.NewDB()
 	if err != nil {
-		log.Fatal("DB初始化失败:", err)
+		slog.Error("DB 初始化失败", "err", err)
+		os.Exit(1)
 	}
 
-	// DB操作句柄
 	queries := db.New(database)
-	log.Println("✅ 数据库已连接")
 
+	// etcd
 	etcdEndpoints := os.Getenv("ETCD_ENDPOINTS")
 	if etcdEndpoints == "" {
 		etcdEndpoints = "localhost:2379"
@@ -56,43 +66,36 @@ func main() {
 		DialTimeout: 5 * time.Second,
 	})
 	if err != nil {
-		log.Fatal("etcd 连接失败:", err)
+		slog.Error("etcd 连接失败", "err", err)
+		os.Exit(1)
 	}
 	defer etcdClient.Close()
-	log.Println("✅ etcd 已连接")
+	slog.Info("etcd 已连接")
 
 	locker := lock.NewDistributedLock(etcdClient, 30)
 
-	// 先创建空的registry
+	// 从 DB 恢复充值地址注册表，服务重启不丢状态
 	registry := types.NewAddressRegistry()
-
-	// 用queries填充registry，服务重启不丢状态
 	addrs, err := queries.ListAllDepositAddresses(context.Background())
 	if err != nil {
-		log.Printf("[WARN] 恢复registry失败: %v", err)
+		slog.Warn("恢复 registry 失败", "err", err)
 	} else {
 		for _, a := range addrs {
 			registry.Register(a.Address, a.UserID)
 		}
-		log.Printf("✅ 从DB恢复了 %d 个充值地址", len(addrs))
+		slog.Info("从 DB 恢复充值地址", "count", len(addrs))
 	}
 
-	for _, a := range addrs {
-		registry.Register(a.Address, a.UserID)
-		log.Printf("[DEBUG] 恢复地址: %s user=%s", a.Address, a.UserID) // 加这行
-	}
-
+	// RPC 配置
 	btcRPCHost := os.Getenv("BTC_RPC_HOST")
 	if btcRPCHost == "" {
 		btcRPCHost = "localhost:18443/wallet/blitz_wallet"
 	}
-
 	ethRPCHost := os.Getenv("ETH_RPC_HOST")
 	if ethRPCHost == "" {
 		ethRPCHost = "http://localhost:8545"
 	}
 
-	// 创建真实 RPC 客户端，外部连接
 	btcCfg := &rpcclient.ConnConfig{
 		Host:         btcRPCHost,
 		User:         "user",
@@ -100,49 +103,43 @@ func main() {
 		HTTPPostMode: true,
 		DisableTLS:   true,
 	}
-
 	btcRPC, _ := rpcclient.New(btcCfg, nil)
 	ethRPC, _ := ethclient.Dial(ethRPCHost)
 
-	// 从环境变量读热钱包私钥
 	hotKeyHex := os.Getenv("ETH_HOT_WALLET_KEY")
 
-	// 创建 Holder
 	btcRPCHolder := config.NewBTCRPCHolder(btcRPC)
 	ethRPCHolder := config.NewETHRPCHolder(ethRPC)
 
-	// ConfigWatcher
 	configWatcher := config.NewConfigWatcher(etcdClient, btcRPCHolder, ethRPCHolder, "user", "pass")
 	go configWatcher.Start(ctx)
 
-	// 组件注入 Holder 而非直接的 rpc 客户端
 	btcWallet := btc.NewBTCWallet(hdWallet, btcRPCHolder, registry, queries)
 	ethWallet := eth.NewETHWallet(hdWallet, ethRPCHolder, registry, queries, hotKeyHex)
 	watcher := btc.NewDepositWatcher(btcRPCHolder, registry)
 	ethWatcher := eth.NewETHDepositWatcher(ethRPCHolder, registry)
 	confirmChecker := core.NewConfirmChecker(queries, btcRPCHolder, ethRPCHolder, etcdClient)
 
-	log.Println("🚀 Wallet Core 服务已启动（真实 RPC 已连接）")
+	slog.Info("Wallet Core 服务已启动")
 
 	jwtSecret := os.Getenv("JWT_SECRET")
 	if jwtSecret == "" {
 		jwtSecret = "dev-secret-change-in-production"
-		log.Println("⚠️  使用测试 JWT secret（生产环境请务必设置 JWT_SECRET 环境变量）")
+		slog.Warn("使用测试 JWT secret，生产环境请务必设置 JWT_SECRET 环境变量")
 	}
 
-	// h := api.NewHandler(btcWallet, ethWallet, queries, redisClient)
-	h := api.NewHandler(btcWallet, ethWallet, queries, database, locker, jwtSecret)
+	mailer := email.NewMailer()
+
+	h := api.NewHandler(btcWallet, ethWallet, queries, database, locker, jwtSecret, mailer)
 	mux := api.NewMux(h, jwtSecret, queries)
 
 	go confirmChecker.Start(ctx)
-	// 开始扫块
 	go watcher.Start(ctx)
 	go ethWatcher.Start(ctx)
 
-	// 抽成函数
 	consumeDeposits := func(ch <-chan types.DepositRecord, chainName string) {
 		for deposit := range ch {
-			log.Printf("📥 %s入账处理: %+v", chainName, deposit)
+			slog.Info("入账处理", "chain", chainName, "tx_id", deposit.TxID, "amount", deposit.Amount)
 
 			confirmed := int32(0)
 			if deposit.Confirmed {
@@ -165,16 +162,16 @@ func main() {
 				if lastErr == nil {
 					metrics.DepositTotal.WithLabelValues(string(deposit.Chain), "detected").Inc()
 					metrics.DepositAmount.WithLabelValues(string(deposit.Chain)).Add(deposit.Amount)
-					log.Printf("✅ %s deposit已写入DB: txid=%s", chainName, deposit.TxID)
+					slog.Info("deposit 已写入 DB", "chain", chainName, "tx_id", deposit.TxID)
 					break
 				}
-				log.Printf("[WARN] %s写入deposit失败(第%d次): %v", chainName, i+1, lastErr)
+				slog.Warn("写入 deposit 失败，重试中", "chain", chainName, "attempt", i+1, "err", lastErr)
 				time.Sleep(time.Duration(i+1) * time.Second)
 			}
 
 			if lastErr != nil {
 				metrics.DeadLetterTotal.WithLabelValues(chainName + "_deposit").Inc()
-				log.Printf("[ERROR] %s deposit写入最终失败，写入死信队列: txid=%s", chainName, deposit.TxID)
+				slog.Error("deposit 写入最终失败，写入死信队列", "chain", chainName, "tx_id", deposit.TxID, "err", lastErr)
 				payload, _ := json.Marshal(params)
 				_ = queries.CreateDeadLetter(context.Background(), db.CreateDeadLetterParams{
 					Type:    chainName + "_deposit",
@@ -189,31 +186,28 @@ func main() {
 	go consumeDeposits(watcher.Deposits(), "BTC")
 	go consumeDeposits(ethWatcher.Deposits(), "ETH")
 
-	sig := make(chan os.Signal, 1)
-	signal.Notify(sig, syscall.SIGINT, syscall.SIGTERM)
-
 	port := os.Getenv("PORT")
 	if port == "" {
 		port = "2113"
 	}
 	srv := &http.Server{Addr: ":" + port, Handler: mux}
 
-	// 信号处理goroutine
+	sig := make(chan os.Signal, 1)
+	signal.Notify(sig, syscall.SIGINT, syscall.SIGTERM)
+
 	go func() {
 		<-sig
-		log.Println("⛔ 收到关闭信号，正在优雅关闭...")
+		slog.Info("收到关闭信号，正在优雅关闭...")
 		srv.Shutdown(context.Background())
 		cancel()
 	}()
 
-	log.Println("📡 API 服务已启动: http://localhost:2113")
-	log.Println(`测试余额: curl "http://localhost:2113/api/v1/balance?address=你的地址&chain=btc"`)
+	slog.Info("API 服务已启动", "addr", "http://localhost:"+port)
 
-	// 开始接受请求
 	if err := srv.ListenAndServe(); err != nil && err != http.ErrServerClosed {
-		log.Fatal(err)
+		slog.Error("HTTP 服务异常退出", "err", err)
+		os.Exit(1)
 	}
 
-	// 等待退出信号
 	<-ctx.Done()
 }

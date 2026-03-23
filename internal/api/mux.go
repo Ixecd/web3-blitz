@@ -23,6 +23,8 @@ func NewMux(h *Handler, jwtSecret string, queries *db.Queries) *http.ServeMux {
 	mux.HandleFunc("/api/v1/withdrawals", h.ListWithdrawals)
 	mux.HandleFunc("/api/v1/refresh", h.Refresh)
 	mux.HandleFunc("/api/v1/logout", h.Logout)
+	mux.HandleFunc("/api/v1/forgot-password", h.ForgotPassword)
+	mux.HandleFunc("/api/v1/reset-password", h.ResetPassword)
 
 	// 需要 JWT 保护的接口
 	mux.HandleFunc("/api/v1/withdraw", auth.JWTMiddleware(jwtSecret, h.Withdraw))

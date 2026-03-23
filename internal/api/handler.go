@@ -2,15 +2,18 @@ package api
 
 import (
 	"context"
+	"crypto/rand"
 	"database/sql"
+	"encoding/hex"
 	"encoding/json"
 	"fmt"
-	"log"
+	"log/slog"
 	"net/http"
 	"time"
 
 	"github.com/Ixecd/web3-blitz/internal/auth"
 	"github.com/Ixecd/web3-blitz/internal/db"
+	"github.com/Ixecd/web3-blitz/internal/email"
 	"github.com/Ixecd/web3-blitz/internal/lock"
 	"github.com/Ixecd/web3-blitz/internal/metrics"
 	"github.com/Ixecd/web3-blitz/internal/pkg/code"
@@ -24,11 +27,12 @@ type Handler struct {
 	ethWallet *eth.ETHWallet
 	queries   *db.Queries
 	db        *sql.DB
+	mailer    *email.Mailer
 	locker    *lock.DistributedLock
 	jwtSecret string
 }
 
-func NewHandler(btcWallet *btc.BTCWallet, ethWallet *eth.ETHWallet, queries *db.Queries, db *sql.DB, locker *lock.DistributedLock, jwtSecret string) *Handler {
+func NewHandler(btcWallet *btc.BTCWallet, ethWallet *eth.ETHWallet, queries *db.Queries, db *sql.DB, locker *lock.DistributedLock, jwtSecret string, mailer *email.Mailer) *Handler {
 	return &Handler{
 		btcWallet: btcWallet,
 		ethWallet: ethWallet,
@@ -36,6 +40,7 @@ func NewHandler(btcWallet *btc.BTCWallet, ethWallet *eth.ETHWallet, queries *db.
 		db:        db,
 		locker:    locker,
 		jwtSecret: jwtSecret,
+		mailer:    mailer,
 	}
 }
 
@@ -327,7 +332,7 @@ func (h *Handler) Withdraw(w http.ResponseWriter, r *http.Request) {
 	status := "completed"
 	if broadcastErr != nil {
 		status = "failed"
-		log.Printf("[ERROR] 提币广播失败 id=%d: %v", record.ID, broadcastErr)
+		slog.Error("提币广播失败", "id", record.ID, "err", broadcastErr)
 	}
 
 	_ = h.queries.UpdateWithdrawalTx(ctx, db.UpdateWithdrawalTxParams{
@@ -338,7 +343,6 @@ func (h *Handler) Withdraw(w http.ResponseWriter, r *http.Request) {
 	})
 
 	if broadcastErr != nil {
-		status = "failed"
 		metrics.WithdrawTotal.WithLabelValues(string(req.Chain), "failed").Inc()
 	} else {
 		metrics.WithdrawTotal.WithLabelValues(string(req.Chain), "completed").Inc()
@@ -437,31 +441,18 @@ func (h *Handler) Register(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
-	rows, _ := h.db.QueryContext(r.Context(), "SELECT id, username, email FROM users")
-	for rows.Next() {
-		var id int64
-		var u, e string
-		rows.Scan(&id, &u, &e)
-		log.Printf("[DEBUG] user记录: id=%d u=%s e=%s", id, u, e)
-	}
-	rows.Close()
-
-	var cnt int
-	h.db.QueryRowContext(r.Context(), "SELECT COUNT(*) FROM users WHERE username=$1", req.Email).Scan(&cnt)
-	log.Printf("[DEBUG] 注册前 username=%s 已存在: %d", req.Email, cnt)
-
-	log.Printf("[DEBUG] 注册请求: email=%s", req.Email)
+	slog.Debug("注册请求", "email", req.Email)
 	user, err := h.queries.CreateUser(r.Context(), db.CreateUserParams{
-		Username: req.Email, // username 复用 email
+		Username: req.Email,
 		Email:    req.Email,
 		Password: hashed,
 	})
 	if err != nil {
-		log.Printf("[ERROR] CreateUser 失败: %v", err)
-		FailMsg(w, code.ErrInternal, err.Error()) // 临时改成这个
+		slog.Error("CreateUser 失败", "email", req.Email, "err", err)
+		Fail(w, code.ErrInternal)
 		return
 	}
-	log.Printf("[DEBUG] 注册成功: id=%d email=%s", user.ID, user.Email)
+	slog.Debug("注册成功", "id", user.ID, "email", user.Email)
 
 	OK(w, map[string]interface{}{
 		"id":    user.ID,
@@ -732,4 +723,107 @@ func (h *Handler) UpdateWithdrawalLimit(w http.ResponseWriter, r *http.Request) 
 		"btc_daily": req.BtcDaily,
 		"eth_daily": req.EthDaily,
 	})
+}
+
+// ForgotPassword POST /api/v1/forgot-password
+// 无论邮箱是否存在都返回成功，避免邮箱枚举攻击。
+func (h *Handler) ForgotPassword(w http.ResponseWriter, r *http.Request) {
+	if r.Method != http.MethodPost {
+		Fail(w, code.ErrInvalidArg)
+		return
+	}
+
+	var req struct {
+		Email string `json:"email"`
+	}
+	if err := json.NewDecoder(r.Body).Decode(&req); err != nil || req.Email == "" {
+		Fail(w, code.ErrInvalidArg)
+		return
+	}
+
+	// 查用户，不存在也返回 OK（防枚举）
+	user, err := h.queries.GetUserByEmail(r.Context(), req.Email)
+	if err != nil {
+		OK(w, map[string]string{"message": "如果该邮箱已注册，重置链接将在几分钟内发送"})
+		return
+	}
+
+	// 生成 32 字节随机 token
+	raw := make([]byte, 32)
+	if _, err := rand.Read(raw); err != nil {
+		Fail(w, code.ErrInternal)
+		return
+	}
+	token := hex.EncodeToString(raw)
+
+	_, err = h.queries.CreatePasswordResetToken(r.Context(), db.CreatePasswordResetTokenParams{
+		UserID:    user.ID,
+		Token:     token,
+		ExpiresAt: time.Now().Add(30 * time.Minute),
+	})
+	if err != nil {
+		slog.Error("CreatePasswordResetToken 失败", "user_id", user.ID, "err", err)
+		Fail(w, code.ErrInternal)
+		return
+	}
+
+	if err := h.mailer.SendResetEmail(user.Email, token); err != nil {
+		slog.Error("发送重置邮件失败", "email", user.Email, "err", err)
+		Fail(w, code.ErrInternal)
+		return
+	}
+
+	OK(w, map[string]string{"message": "如果该邮箱已注册，重置链接将在几分钟内发送"})
+}
+
+// ResetPassword POST /api/v1/reset-password
+func (h *Handler) ResetPassword(w http.ResponseWriter, r *http.Request) {
+	if r.Method != http.MethodPost {
+		Fail(w, code.ErrInvalidArg)
+		return
+	}
+
+	var req struct {
+		Token    string `json:"token"`
+		Password string `json:"password"`
+	}
+	if err := json.NewDecoder(r.Body).Decode(&req); err != nil {
+		Fail(w, code.ErrInvalidArg)
+		return
+	}
+	if req.Token == "" || len(req.Password) < 8 {
+		FailMsg(w, code.ErrInvalidArg, "token 不能为空，密码长度不能少于 8 位")
+		return
+	}
+
+	// 验证 token
+	rt, err := h.queries.GetPasswordResetToken(r.Context(), req.Token)
+	if err != nil {
+		FailMsg(w, code.ErrInvalidArg, "重置链接已失效或不存在")
+		return
+	}
+
+	// hash 新密码
+	hashed, err := auth.HashPassword(req.Password)
+	if err != nil {
+		Fail(w, code.ErrInternal)
+		return
+	}
+
+	// 更新密码
+	if err := h.queries.UpdateUserPassword(r.Context(), db.UpdateUserPasswordParams{
+		ID:       rt.UserID,
+		Password: hashed,
+	}); err != nil {
+		Fail(w, code.ErrInternal)
+		return
+	}
+
+	// token 标记已使用
+	_ = h.queries.MarkPasswordResetTokenUsed(r.Context(), req.Token)
+
+	// 踢掉所有 refresh token，强制重新登录
+	_ = h.queries.RevokeAllUserRefreshTokens(r.Context(), rt.UserID)
+
+	OK(w, map[string]string{"message": "密码已重置，请重新登录"})
 }

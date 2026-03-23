@@ -1,48 +1,84 @@
 import { useState, useEffect, useRef } from 'react'
 import { useNavigate } from 'react-router-dom'
 import { useAuth } from '@/contexts/AuthContext'
-import { ApiError } from '@/api/client'
+import { ApiError, api } from '@/api/client'
 import ThemeSwitcher from '@/components/ThemeSwitcher'
 
+type Mode = 'login' | 'register'
+
 export default function Login() {
+  const [mode,        setMode]        = useState<Mode>('login')
   const [emailErr,    setEmailErr]    = useState('')
   const [passwordErr, setPasswordErr] = useState('')
+  const [confirmErr,  setConfirmErr]  = useState('')
   const [globalErr,   setGlobalErr]   = useState('')
+  const [globalOk,    setGlobalOk]    = useState('')
   const [loading,     setLoading]     = useState(false)
   const [showPwd,     setShowPwd]     = useState(false)
+  const [rememberMe,  setRememberMe]  = useState(false)
   const [mounted,     setMounted]     = useState(false)
-  const emailRef = useRef<HTMLInputElement>(null)
+  const [canSubmit,   setCanSubmit]   = useState(false)
+
+  const emailRef    = useRef<HTMLInputElement>(null)
   const passwordRef = useRef<HTMLInputElement>(null)
+  const confirmRef  = useRef<HTMLInputElement>(null)
+
   const { login } = useAuth()
   const navigate  = useNavigate()
 
   useEffect(() => { setTimeout(() => setMounted(true), 50) }, [])
 
-  const [canSubmit, setCanSubmit] = useState(false)
+  // 切换 mode 时清空所有状态
+  const switchMode = (m: Mode) => {
+    setMode(m)
+    setEmailErr(''); setPasswordErr(''); setConfirmErr('')
+    setGlobalErr(''); setGlobalOk('')
+    setCanSubmit(false); setShowPwd(false)
+    // 下一帧再聚焦
+    setTimeout(() => emailRef.current?.focus(), 50)
+  }
 
   const checkCanSubmit = () => {
     const e = emailRef.current?.value ?? ''
     const p = passwordRef.current?.value ?? ''
-    setCanSubmit(e.trim().length > 0 && p.trim().length > 0)
+    const c = confirmRef.current?.value ?? ''
+    if (mode === 'login')    setCanSubmit(e.trim().length > 0 && p.trim().length > 0)
+    if (mode === 'register') setCanSubmit(e.trim().length > 0 && p.trim().length > 0 && c.trim().length > 0)
   }
 
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault()
-    const email = emailRef.current?.value ?? ''
+    const email    = emailRef.current?.value    ?? ''
     const password = passwordRef.current?.value ?? ''
-    let valid = true
+    const confirm  = confirmRef.current?.value  ?? ''
+
     const emailReg = /^[^\s@]+@[^\s@]+\.[^\s@]+$/
-    if (!email.trim()) { setEmailErr('请输入邮件地址'); valid = false }
+    let valid = true
+
+    if (!email.trim())          { setEmailErr('请输入邮件地址'); valid = false }
     else if (!emailReg.test(email)) { setEmailErr('邮件地址格式不正确'); valid = false }
-    if (!password.trim()) { setPasswordErr('请输入密码');   valid = false }
+    if (!password.trim())       { setPasswordErr('请输入密码'); valid = false }
+    else if (password.length < 8) { setPasswordErr('密码长度不能少于 8 位'); valid = false }
+
+    if (mode === 'register') {
+      if (!confirm.trim())       { setConfirmErr('请确认密码'); valid = false }
+      else if (confirm !== password) { setConfirmErr('两次密码不一致'); valid = false }
+    }
+
     if (!valid) return
-    setGlobalErr('')
-    setLoading(true)
+    setGlobalErr(''); setLoading(true)
+
     try {
-      await login(emailRef.current?.value ?? '', passwordRef.current?.value ?? '')
-      navigate('/')
+      if (mode === 'login') {
+        await login(email, password, rememberMe)
+        navigate('/')
+      } else {
+        await api.post('/api/v1/register', { email, password })
+        setGlobalOk('注册成功，请登录')
+        switchMode('login')
+      }
     } catch (err) {
-      setGlobalErr(err instanceof ApiError ? err.message : '用户名或密码错误')
+      setGlobalErr(err instanceof ApiError ? err.message : mode === 'login' ? '用户名或密码错误' : '注册失败，请重试')
     } finally {
       setLoading(false)
     }
@@ -57,12 +93,11 @@ export default function Login() {
     color: 'var(--color-text-muted)',
     marginBottom: '6px',
   }
-
   const errStyle: React.CSSProperties = {
     fontFamily: "'IBM Plex Mono', monospace",
     fontSize: '12px',
     color: 'var(--color-danger)',
-    marginTop: '8px',
+    marginTop: '6px',
     display: 'block',
   }
 
@@ -134,40 +169,32 @@ export default function Login() {
         fontFamily:"'DM Sans',sans-serif",
       }}>
 
-        {/* ── 动态光晕 ── */}
+        {/* 动态光晕 */}
         <div style={{position:'absolute',inset:0,pointerEvents:'none',overflow:'hidden'}}>
           <div style={{
             position:'absolute', width:'800px', height:'700px',
             borderRadius:'50%', top:'-20%', right:'-8%',
-            background:`radial-gradient(ellipse,
-              color-mix(in srgb,var(--color-accent) 35%,transparent) 0%,
-              transparent 65%)`,
+            background:`radial-gradient(ellipse,color-mix(in srgb,var(--color-accent) 35%,transparent) 0%,transparent 65%)`,
             animation:'float1 4s ease-in-out infinite',
           }}/>
           <div style={{
             position:'absolute', width:'600px', height:'550px',
             borderRadius:'50%', bottom:'5%', right:'15%',
-            background:`radial-gradient(ellipse,
-              color-mix(in srgb,var(--color-accent) 28%,transparent) 0%,
-              transparent 60%)`,
+            background:`radial-gradient(ellipse,color-mix(in srgb,var(--color-accent) 28%,transparent) 0%,transparent 60%)`,
             animation:'float2 5s ease-in-out infinite',
           }}/>
           <div style={{
             position:'absolute', width:'450px', height:'400px',
             borderRadius:'50%', top:'20%', left:'-10%',
-            background:`radial-gradient(ellipse,
-              color-mix(in srgb,var(--color-accent) 20%,transparent) 0%,
-              transparent 55%)`,
+            background:`radial-gradient(ellipse,color-mix(in srgb,var(--color-accent) 20%,transparent) 0%,transparent 55%)`,
             animation:'float3 6s ease-in-out infinite',
           }}/>
         </div>
 
-        {/* ── 网格 ── */}
+        {/* 网格 */}
         <div style={{
           position:'absolute', inset:0, pointerEvents:'none',
-          backgroundImage:`
-            linear-gradient(var(--color-grid) 1px,transparent 1px),
-            linear-gradient(90deg,var(--color-grid) 1px,transparent 1px)`,
+          backgroundImage:`linear-gradient(var(--color-grid) 1px,transparent 1px),linear-gradient(90deg,var(--color-grid) 1px,transparent 1px)`,
           backgroundSize:'60px 60px',
           animation:'gridPulse 6s ease-in-out infinite',
         }}/>
@@ -177,12 +204,11 @@ export default function Login() {
           <ThemeSwitcher/>
         </div>
 
-        {/* ── 左侧 ── */}
-        <div className="login-left" style={{
+        {/* 左侧 */}
+        <div style={{
           flex:'1', display:'flex', flexDirection:'column',
           padding:'clamp(32px,5vh,56px) clamp(32px,5vw,64px)', position:'relative', zIndex:1,
         }}>
-          {/* Logo */}
           <div style={{display:'flex',alignItems:'center',gap:'16px'}}>
             <svg width="48" height="48" viewBox="0 0 40 40" fill="none">
               <rect width="40" height="40" rx="9" fill="var(--color-accent)"/>
@@ -194,16 +220,9 @@ export default function Login() {
               color:'var(--color-text-primary)',
             }}>BLITZ</span>
           </div>
-
-          {/* 标题 — 右移 + 更低 */}
-          <div style={{
-            flex:1, display:'flex',
-            alignItems:'flex-end', justifyContent:'flex-start',
-          }}>
+          <div style={{flex:1,display:'flex',alignItems:'flex-end',justifyContent:'flex-start'}}>
             <h1 style={{
-              position:'absolute',
-              left:'64px',
-              bottom:'64px',
+              position:'absolute', left:'64px', bottom:'64px',
               lineHeight:1,
               fontFamily:"'Syne',sans-serif", fontWeight:800,
               fontSize:'clamp(64px,7vw,104px)',
@@ -213,29 +232,28 @@ export default function Login() {
               transform: mounted ? 'translateY(0)' : 'translateY(24px)',
               transition:'opacity 0.9s cubic-bezier(0.16,1,0.3,1), transform 0.9s cubic-bezier(0.16,1,0.3,1)',
             }}>
-              欢迎<br/>回来。
+              {mode === 'login' ? <>欢迎<br/>回来。</> : <>创建<br/>账户。</>}
             </h1>
           </div>
         </div>
 
-        {/* ── 右侧 — 完全透明 ── */}
+        {/* 右侧表单 */}
         <div style={{
           flex:'0 0 auto', width:'min(440px, 36vw)', marginRight:'2vw',
           display:'flex', flexDirection:'column', justifyContent:'center', overflowY:'auto',
           padding:'clamp(48px,8vh,96px) clamp(32px,4vw,56px)', position:'relative', zIndex:1,
         }}>
-          <form onSubmit={handleSubmit} noValidate style={{
-            display:'flex', flexDirection:'column', gap:'20px',
-          }}>
+          <form onSubmit={handleSubmit} noValidate style={{display:'flex',flexDirection:'column',gap:'20px'}}>
 
-            {/* 标题 */}
             <h2 style={{
               fontFamily:"'Syne',sans-serif", fontWeight:800,
               fontSize:'26px', letterSpacing:'-0.02em',
               color:'var(--color-text-primary)', margin:'0 0 8px 0',
-            }}>登录您的账户</h2>
+            }}>
+              {mode === 'login' ? '登录您的账户' : '注册新账户'}
+            </h2>
 
-            {/* 邮件地址 */}
+            {/* 邮件 */}
             <div>
               <label style={labelStyle}>邮件地址</label>
               <input
@@ -244,42 +262,43 @@ export default function Login() {
                 placeholder="your@email.com"
                 onChange={() => { setEmailErr(''); checkCanSubmit() }}
                 onInput={() => { setEmailErr(''); checkCanSubmit() }}
-                className={`l-input${emailErr?' err':''}`}
+                className={`l-input${emailErr ? ' err' : ''}`}
               />
+              {emailErr && <span style={errStyle}>{emailErr}</span>}
             </div>
 
             {/* 密码 */}
             <div style={{position:'relative'}}>
               <div style={{display:'flex',alignItems:'center',justifyContent:'space-between',marginBottom:'6px'}}>
-                <label style={{...labelStyle, marginBottom:0}}>密码</label>
-                <button type="button" style={{
-                  background:'none', border:'none', padding:0,
-                  fontFamily:"'DM Sans',sans-serif", fontSize:'13px',
-                  color:'var(--color-accent)', cursor:'pointer',
-                  transition:'opacity 0.15s',
-                }}
-                onMouseEnter={e=>(e.currentTarget.style.opacity='0.6')}
-                onMouseLeave={e=>(e.currentTarget.style.opacity='1')}
-                >忘记密码？</button>
+                <label style={{...labelStyle,marginBottom:0}}>密码</label>
+                {mode === 'login' && (
+                  <button type="button"
+                    onClick={() => navigate('/forgot-password')}
+                    style={{
+                      background:'none', border:'none', padding:0,
+                      fontFamily:"'DM Sans',sans-serif", fontSize:'13px',
+                      color:'var(--color-accent)', cursor:'pointer', transition:'opacity 0.15s',
+                    }}
+                    onMouseEnter={e=>(e.currentTarget.style.opacity='0.6')}
+                    onMouseLeave={e=>(e.currentTarget.style.opacity='1')}
+                  >忘记密码？</button>
+                )}
               </div>
               <input
                 ref={passwordRef}
-                type={showPwd ? "text" : "password"} autoComplete="current-password"
+                type={showPwd ? 'text' : 'password'}
+                autoComplete={mode === 'login' ? 'current-password' : 'new-password'}
                 placeholder="••••••••••"
                 onChange={() => { setPasswordErr(''); checkCanSubmit() }}
                 onInput={() => { setPasswordErr(''); checkCanSubmit() }}
-                className={`l-input${passwordErr?' err':''}`}
+                className={`l-input${passwordErr ? ' err' : ''}`}
               />
-              {/* 查看密码按钮 */}
-              <button
-                type="button"
-                onClick={() => setShowPwd(p => !p)}
-                style={{
-                  position:'absolute', right:0, bottom:'14px',
-                  background:'none', border:'none', padding:'4px',
-                  cursor:'pointer', color:'var(--color-text-faint)',
-                  transition:'color 0.15s', lineHeight:1,
-                }}
+              <button type="button" onClick={() => setShowPwd(p => !p)} style={{
+                position:'absolute', right:0, bottom: passwordErr ? '28px' : '14px',
+                background:'none', border:'none', padding:'4px',
+                cursor:'pointer', color:'var(--color-text-faint)',
+                transition:'color 0.15s', lineHeight:1,
+              }}
                 onMouseEnter={e=>(e.currentTarget.style.color='var(--color-text-muted)')}
                 onMouseLeave={e=>(e.currentTarget.style.color='var(--color-text-faint)')}
               >
@@ -299,47 +318,70 @@ export default function Login() {
               {passwordErr && <span style={errStyle}>{passwordErr}</span>}
             </div>
 
-            {/* 记住我 */}
-            <label style={{
-              display:'flex', alignItems:'center', gap:'10px',
-              cursor:'pointer', userSelect:'none',
-            }}>
-              <div style={{
-                width:'18px', height:'18px', borderRadius:'4px',
-                border:'1px solid var(--color-border-strong)',
-                backgroundColor:'transparent',
-                display:'flex', alignItems:'center', justifyContent:'center',
-                flexShrink:0,
-              }}>
-                <svg width="10" height="8" viewBox="0 0 10 8" fill="none">
-                  <path d="M1 4l3 3 5-6" stroke="var(--color-accent)" strokeWidth="1.5"
-                    strokeLinecap="round" strokeLinejoin="round"/>
-                </svg>
+            {/* 确认密码（仅注册） */}
+            {mode === 'register' && (
+              <div>
+                <label style={labelStyle}>确认密码</label>
+                <input
+                  ref={confirmRef}
+                  type={showPwd ? 'text' : 'password'}
+                  autoComplete="new-password"
+                  placeholder="••••••••••"
+                  onChange={() => { setConfirmErr(''); checkCanSubmit() }}
+                  onInput={() => { setConfirmErr(''); checkCanSubmit() }}
+                  className={`l-input${confirmErr ? ' err' : ''}`}
+                />
+                {confirmErr && <span style={errStyle}>{confirmErr}</span>}
               </div>
-              <span style={{
-                fontFamily:"'DM Sans',sans-serif", fontSize:'13px',
-                color:'var(--color-text-muted)',
-              }}>在该设备上记住我</span>
-            </label>
+            )}
 
-            {/* 错误提示 — 紧凑单行 */}
-            <div style={{height:'16px', display:'flex', alignItems:'center', gap:'5px', marginTop:'-4px'}}>
-              {(emailErr || globalErr) && (<>
-                <svg width="11" height="11" viewBox="0 0 14 14" fill="none" style={{flexShrink:0}}>
-                  <path d="M7 1L13 12H1L7 1z" stroke="var(--color-danger)" strokeWidth="1.4"
-                    strokeLinejoin="round"/>
-                  <path d="M7 5.5v3M7 10h.01" stroke="var(--color-danger)" strokeWidth="1.4"
-                    strokeLinecap="round"/>
-                </svg>
-                <span style={{
-                  fontFamily:"'DM Sans',monospace",
-                  fontSize:'12px', color:'var(--color-danger)',
-                  opacity:0.9,
-                }}>{emailErr || globalErr}</span>
-              </>)}
+            {/* 记住我（仅登录） */}
+            {mode === 'login' && (
+              <label style={{display:'flex',alignItems:'center',gap:'10px',cursor:'pointer',userSelect:'none'}}>
+                <div
+                  onClick={() => setRememberMe(v => !v)}
+                  style={{
+                    width:'18px', height:'18px', borderRadius:'4px',
+                    border:'1px solid var(--color-border-strong)',
+                    backgroundColor: rememberMe ? 'var(--color-accent)' : 'transparent',
+                    display:'flex', alignItems:'center', justifyContent:'center',
+                    flexShrink:0, cursor:'pointer', transition:'background 0.15s',
+                  }}
+                >
+                  {rememberMe && (
+                    <svg width="10" height="8" viewBox="0 0 10 8" fill="none">
+                      <path d="M1 4l3 3 5-6" stroke="var(--color-base)" strokeWidth="1.5"
+                        strokeLinecap="round" strokeLinejoin="round"/>
+                    </svg>
+                  )}
+                </div>
+                <span style={{fontFamily:"'DM Sans',sans-serif",fontSize:'13px',color:'var(--color-text-muted)'}}>
+                  在该设备上记住我
+                </span>
+              </label>
+            )}
+
+            {/* 错误 / 成功提示 */}
+            <div style={{height:'16px',display:'flex',alignItems:'center',gap:'5px',marginTop:'-4px'}}>
+              {(emailErr || globalErr) && (
+                <>
+                  <svg width="11" height="11" viewBox="0 0 14 14" fill="none" style={{flexShrink:0}}>
+                    <path d="M7 1L13 12H1L7 1z" stroke="var(--color-danger)" strokeWidth="1.4" strokeLinejoin="round"/>
+                    <path d="M7 5.5v3M7 10h.01" stroke="var(--color-danger)" strokeWidth="1.4" strokeLinecap="round"/>
+                  </svg>
+                  <span style={{fontFamily:"'DM Sans',monospace",fontSize:'12px',color:'var(--color-danger)',opacity:0.9}}>
+                    {emailErr || globalErr}
+                  </span>
+                </>
+              )}
+              {globalOk && !globalErr && (
+                <span style={{fontFamily:"'DM Sans',sans-serif",fontSize:'12px',color:'var(--color-accent)'}}>
+                  ✓ {globalOk}
+                </span>
+              )}
             </div>
 
-            {/* 进入系统 */}
+            {/* 提交按钮 */}
             <button
               type="submit"
               disabled={!canSubmit || loading}
@@ -349,8 +391,7 @@ export default function Login() {
                 background: canSubmit && !loading
                   ? 'var(--color-accent)'
                   : 'color-mix(in srgb,var(--color-raised) 55%,transparent)',
-                border:'1px solid ' + (canSubmit && !loading
-                  ? 'transparent' : 'var(--color-border)'),
+                border:'1px solid ' + (canSubmit && !loading ? 'transparent' : 'var(--color-border)'),
                 borderRadius:'4px',
                 fontFamily:"'Syne',sans-serif", fontWeight:700,
                 fontSize:'15px', letterSpacing:'0.06em',
@@ -358,70 +399,66 @@ export default function Login() {
                 cursor: canSubmit && !loading ? 'pointer' : 'not-allowed',
                 transition:'all 0.2s',
               }}
-              onMouseEnter={e => {
-                if (canSubmit && !loading)
-                  (e.currentTarget as HTMLButtonElement).style.filter='brightness(1.12)'
-              }}
-              onMouseLeave={e => {
-                (e.currentTarget as HTMLButtonElement).style.filter=''
-              }}
+              onMouseEnter={e => { if (canSubmit && !loading) (e.currentTarget as HTMLButtonElement).style.filter='brightness(1.12)' }}
+              onMouseLeave={e => { (e.currentTarget as HTMLButtonElement).style.filter='' }}
             >
-              <span>{loading ? '验证中…' : '进入系统'}</span>
+              <span>{loading ? (mode === 'login' ? '验证中…' : '注册中…') : (mode === 'login' ? '进入系统' : '创建账户')}</span>
               {!loading && (
                 <svg width="18" height="18" viewBox="0 0 18 18" fill="none">
-                  <path d="M3.5 9h11M10 5l4 4-4 4"
-                    stroke="currentColor" strokeWidth="1.5"
-                    strokeLinecap="round" strokeLinejoin="round"/>
+                  <path d="M3.5 9h11M10 5l4 4-4 4" stroke="currentColor" strokeWidth="1.5" strokeLinecap="round" strokeLinejoin="round"/>
                 </svg>
               )}
             </button>
 
-            {/* ── 或 分割线 ── */}
+            {/* 分割线 */}
             <div style={{display:'flex',alignItems:'center',gap:'16px',margin:'0'}}>
               <div style={{flex:1,height:'1px',backgroundColor:'var(--color-border)'}}/>
-              <span style={{
-                fontFamily:"'IBM Plex Mono',monospace",
-                fontSize:'11px', color:'var(--color-text-faint)', letterSpacing:'0.12em',
-              }}>或</span>
+              <span style={{fontFamily:"'IBM Plex Mono',monospace",fontSize:'11px',color:'var(--color-text-faint)',letterSpacing:'0.12em'}}>或</span>
               <div style={{flex:1,height:'1px',backgroundColor:'var(--color-border)'}}/>
             </div>
 
-            {/* ── 其他选项 ── */}
+            {/* 底部操作 */}
             <div style={{display:'flex',flexDirection:'column',gap:'8px'}}>
-              <button type="button" className="l-alt">
-                <svg width="16" height="16" viewBox="0 0 16 16" fill="none">
-                  <rect x="1" y="1" width="5" height="5" rx="1" stroke="currentColor" strokeWidth="1.2"/>
-                  <rect x="3" y="3" width="1" height="1" fill="currentColor"/>
-                  <rect x="10" y="1" width="5" height="5" rx="1" stroke="currentColor" strokeWidth="1.2"/>
-                  <rect x="12" y="3" width="1" height="1" fill="currentColor"/>
-                  <rect x="1" y="10" width="5" height="5" rx="1" stroke="currentColor" strokeWidth="1.2"/>
-                  <rect x="3" y="12" width="1" height="1" fill="currentColor"/>
-                  <rect x="10" y="10" width="2" height="2" fill="currentColor"/>
-                  <rect x="13" y="10" width="2" height="2" fill="currentColor"/>
-                  <rect x="10" y="13" width="2" height="2" fill="currentColor"/>
-                  <rect x="13" y="13" width="2" height="2" fill="currentColor"/>
-                </svg>
-                扫码登录
-              </button>
-
-              <button type="button" className="l-alt">
-                <svg width="16" height="16" viewBox="0 0 16 16" fill="none">
-                  <circle cx="8" cy="5" r="3" stroke="currentColor" strokeWidth="1.2"/>
-                  <path d="M2 13c0-2.2 2.7-4 6-4s6 1.8 6 4"
-                    stroke="currentColor" strokeWidth="1.2" strokeLinecap="round"/>
-                  <path d="M12 1.5v4M10 3.5h4"
-                    stroke="currentColor" strokeWidth="1.2" strokeLinecap="round"/>
-                </svg>
-                注册新账号
-              </button>
+              {mode === 'login' ? (
+                <>
+                  <button type="button" className="l-alt">
+                    <svg width="16" height="16" viewBox="0 0 16 16" fill="none">
+                      <rect x="1" y="1" width="5" height="5" rx="1" stroke="currentColor" strokeWidth="1.2"/>
+                      <rect x="3" y="3" width="1" height="1" fill="currentColor"/>
+                      <rect x="10" y="1" width="5" height="5" rx="1" stroke="currentColor" strokeWidth="1.2"/>
+                      <rect x="12" y="3" width="1" height="1" fill="currentColor"/>
+                      <rect x="1" y="10" width="5" height="5" rx="1" stroke="currentColor" strokeWidth="1.2"/>
+                      <rect x="3" y="12" width="1" height="1" fill="currentColor"/>
+                      <rect x="10" y="10" width="2" height="2" fill="currentColor"/>
+                      <rect x="13" y="10" width="2" height="2" fill="currentColor"/>
+                      <rect x="10" y="13" width="2" height="2" fill="currentColor"/>
+                      <rect x="13" y="13" width="2" height="2" fill="currentColor"/>
+                    </svg>
+                    扫码登录
+                  </button>
+                  <button type="button" className="l-alt" onClick={() => switchMode('register')}>
+                    <svg width="16" height="16" viewBox="0 0 16 16" fill="none">
+                      <circle cx="8" cy="5" r="3" stroke="currentColor" strokeWidth="1.2"/>
+                      <path d="M2 13c0-2.2 2.7-4 6-4s6 1.8 6 4" stroke="currentColor" strokeWidth="1.2" strokeLinecap="round"/>
+                      <path d="M12 1.5v4M10 3.5h4" stroke="currentColor" strokeWidth="1.2" strokeLinecap="round"/>
+                    </svg>
+                    注册新账号
+                  </button>
+                </>
+              ) : (
+                <button type="button" className="l-alt" onClick={() => switchMode('login')}>
+                  <svg width="16" height="16" viewBox="0 0 16 16" fill="none">
+                    <path d="M10 3L4 8l6 5" stroke="currentColor" strokeWidth="1.2" strokeLinecap="round" strokeLinejoin="round"/>
+                  </svg>
+                  返回登录
+                </button>
+              )}
             </div>
 
           </form>
 
           <p style={{
-            position:'absolute',
-            bottom:'64px',
-            left:0, right:0,
+            position:'absolute', bottom:'64px', left:0, right:0,
             fontFamily:"'IBM Plex Mono',monospace",
             fontSize:'11px', color:'var(--color-text-faint)',
             letterSpacing:'0.08em', margin:0, textAlign:'center',

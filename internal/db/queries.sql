@@ -170,3 +170,19 @@ SELECT * FROM withdrawal_limits ORDER BY level ASC;
 UPDATE withdrawal_limits
 SET btc_daily = @btc_daily, eth_daily = @eth_daily
 WHERE level = @level;
+
+-- name: CreatePasswordResetToken :one
+INSERT INTO password_reset_tokens (user_id, token, expires_at)
+VALUES (@user_id, @token, @expires_at)
+RETURNING *;
+
+-- name: GetPasswordResetToken :one
+SELECT * FROM password_reset_tokens
+WHERE token = @token AND used = FALSE AND expires_at > NOW()
+LIMIT 1;
+
+-- name: MarkPasswordResetTokenUsed :exec
+UPDATE password_reset_tokens SET used = TRUE WHERE token = @token;
+
+-- name: UpdateUserPassword :exec
+UPDATE users SET password = @password, updated_at = NOW() WHERE id = @id;

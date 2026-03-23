@@ -13,6 +13,7 @@ type Querier interface {
 	CreateDeadLetter(ctx context.Context, arg CreateDeadLetterParams) error
 	CreateDeposit(ctx context.Context, arg CreateDepositParams) error
 	CreateDepositAddress(ctx context.Context, arg CreateDepositAddressParams) error
+	CreatePasswordResetToken(ctx context.Context, arg CreatePasswordResetTokenParams) (PasswordResetToken, error)
 	CreateRefreshToken(ctx context.Context, arg CreateRefreshTokenParams) (RefreshToken, error)
 	CreateUser(ctx context.Context, arg CreateUserParams) (User, error)
 	CreateWithdrawal(ctx context.Context, arg CreateWithdrawalParams) (Withdrawal, error)
@@ -20,6 +21,7 @@ type Querier interface {
 	GetAllChainsTotalDeposit(ctx context.Context) (interface{}, error)
 	GetDepositByTxID(ctx context.Context, txID string) (Deposit, error)
 	GetLast24hWithdrawalByUserAndChain(ctx context.Context, arg GetLast24hWithdrawalByUserAndChainParams) (interface{}, error)
+	GetPasswordResetToken(ctx context.Context, token string) (PasswordResetToken, error)
 	GetRefreshToken(ctx context.Context, token string) (RefreshToken, error)
 	GetRoleByName(ctx context.Context, name string) (Role, error)
 	GetRolePermissions(ctx context.Context, roleID int64) ([]Permission, error)
@@ -42,12 +44,14 @@ type Querier interface {
 	ListUsers(ctx context.Context) ([]ListUsersRow, error)
 	ListWithdrawalLimits(ctx context.Context) ([]WithdrawalLimit, error)
 	ListWithdrawalsByUserID(ctx context.Context, userID string) ([]Withdrawal, error)
+	MarkPasswordResetTokenUsed(ctx context.Context, token string) error
 	RemoveRoleFromUser(ctx context.Context, arg RemoveRoleFromUserParams) error
 	ResolveDeadLetter(ctx context.Context, id int64) error
 	RevokeAllUserRefreshTokens(ctx context.Context, userID int64) error
 	RevokeRefreshToken(ctx context.Context, token string) error
 	UpdateDepositConfirmed(ctx context.Context, id int64) error
 	UpdateUserLevel(ctx context.Context, arg UpdateUserLevelParams) error
+	UpdateUserPassword(ctx context.Context, arg UpdateUserPasswordParams) error
 	UpdateWithdrawalLimit(ctx context.Context, arg UpdateWithdrawalLimitParams) error
 	UpdateWithdrawalTx(ctx context.Context, arg UpdateWithdrawalTxParams) error
 }

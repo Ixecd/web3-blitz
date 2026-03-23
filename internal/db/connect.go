@@ -3,9 +3,12 @@ package db
 import (
 	"database/sql"
 	"fmt"
-	"log"
+	"log/slog"
 	"os"
 
+	"github.com/golang-migrate/migrate/v4"
+	"github.com/golang-migrate/migrate/v4/database/postgres"
+	_ "github.com/golang-migrate/migrate/v4/source/file"
 	_ "github.com/jackc/pgx/v5/stdlib"
 )
 
@@ -15,30 +18,49 @@ func NewDB() (*sql.DB, error) {
 		dsn = "postgres://blitz:blitz@localhost:5432/blitz?sslmode=disable"
 	}
 
-	db, err := sql.Open("pgx", dsn)
+	database, err := sql.Open("pgx", dsn)
 	if err != nil {
 		return nil, fmt.Errorf("open db: %w", err)
 	}
-	if err := db.Ping(); err != nil {
+	if err := database.Ping(); err != nil {
 		return nil, fmt.Errorf("ping db: %w", err)
 	}
-	db.Exec(`ALTER TABLE users ADD COLUMN IF NOT EXISTS email TEXT`)
-	db.Exec(`UPDATE users SET email = username WHERE email IS NULL`)
-	db.Exec(`ALTER TABLE users ALTER COLUMN email SET NOT NULL`)
-	if err := runSeed(db); err != nil {
-		return nil, fmt.Errorf("seed db: %w", err)
+
+	if err := runMigrations(database); err != nil {
+		return nil, fmt.Errorf("migrate db: %w", err)
 	}
 
-	var dbName string
-	db.QueryRow("SELECT current_database()").Scan(&dbName)
-	log.Printf("[DEBUG] DSN: %s", dsn)
-	log.Printf("[DEBUG] 实际连接数据库: %s", dbName)
+	slog.Info("数据库已连接")
+	return database, nil
+}
 
-	var hasEmail bool
-	db.QueryRow("SELECT EXISTS(SELECT 1 FROM information_schema.columns WHERE table_name='users' AND column_name='email')").Scan(&hasEmail)
-	log.Printf("[DEBUG] users.email 存在: %v", hasEmail)
+func runMigrations(database *sql.DB) error {
+	migrationsPath := os.Getenv("MIGRATIONS_PATH")
+	if migrationsPath == "" {
+		migrationsPath = "internal/db/migrations"
+	}
 
-	return db, nil
+	driver, err := postgres.WithInstance(database, &postgres.Config{})
+	if err != nil {
+		return fmt.Errorf("migrate driver: %w", err)
+	}
+
+	m, err := migrate.NewWithDatabaseInstance(
+		"file://"+migrationsPath,
+		"postgres",
+		driver,
+	)
+	if err != nil {
+		return fmt.Errorf("migrate init: %w", err)
+	}
+
+	if err := m.Up(); err != nil && err != migrate.ErrNoChange {
+		return fmt.Errorf("migrate up: %w", err)
+	}
+
+	v, _, _ := m.Version()
+	slog.Info("数据库迁移完成", "version", v)
+	return nil
 }
 
 func runSeed(db *sql.DB) error {

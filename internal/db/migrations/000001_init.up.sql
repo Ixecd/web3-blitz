@@ -73,30 +73,26 @@ CREATE TABLE IF NOT EXISTS dead_letters (
     updated_at TIMESTAMPTZ DEFAULT NOW()
 );
 
--- 角色表
 CREATE TABLE IF NOT EXISTS roles (
     id          BIGSERIAL PRIMARY KEY,
-    name        TEXT NOT NULL UNIQUE,  -- admin / operator / user
+    name        TEXT NOT NULL UNIQUE,
     description TEXT NOT NULL DEFAULT '',
     created_at  TIMESTAMPTZ DEFAULT NOW()
 );
 
--- 权限表
 CREATE TABLE IF NOT EXISTS permissions (
     id          BIGSERIAL PRIMARY KEY,
-    name        TEXT NOT NULL UNIQUE,  -- user:read / user:upgrade / limit:write 等
+    name        TEXT NOT NULL UNIQUE,
     description TEXT NOT NULL DEFAULT '',
     created_at  TIMESTAMPTZ DEFAULT NOW()
 );
 
--- 角色-权限关联
 CREATE TABLE IF NOT EXISTS role_permissions (
     role_id       BIGINT NOT NULL REFERENCES roles(id),
     permission_id BIGINT NOT NULL REFERENCES permissions(id),
     PRIMARY KEY (role_id, permission_id)
 );
 
--- 用户-角色关联
 CREATE TABLE IF NOT EXISTS user_roles (
     user_id BIGINT NOT NULL REFERENCES users(id),
     role_id BIGINT NOT NULL REFERENCES roles(id),
@@ -105,17 +101,17 @@ CREATE TABLE IF NOT EXISTS user_roles (
 
 -- 初始化角色
 INSERT INTO roles (name, description) VALUES
-('admin', '管理员'),
+('admin',    '管理员'),
 ('operator', '运营'),
-('user', '普通用户')
+('user',     '普通用户')
 ON CONFLICT (name) DO NOTHING;
 
 -- 初始化权限
 INSERT INTO permissions (name, description) VALUES
-('user:read', '查看用户列表'),
+('user:read',    '查看用户列表'),
 ('user:upgrade', '升级用户等级'),
-('limit:read', '查看提币限额'),
-('limit:write', '修改提币限额')
+('limit:read',   '查看提币限额'),
+('limit:write',  '修改提币限额')
 ON CONFLICT (name) DO NOTHING;
 
 -- admin 角色绑定所有权限
@@ -124,12 +120,10 @@ SELECT r.id, p.id FROM roles r, permissions p
 WHERE r.name = 'admin'
 ON CONFLICT DO NOTHING;
 
--- 密码重置 token 表
-CREATE TABLE IF NOT EXISTS password_reset_tokens (
-    id         BIGSERIAL PRIMARY KEY,
-    user_id    BIGINT NOT NULL REFERENCES users(id),
-    token      TEXT NOT NULL UNIQUE,
-    expires_at TIMESTAMPTZ NOT NULL,
-    used       BOOLEAN NOT NULL DEFAULT FALSE,
-    created_at TIMESTAMPTZ DEFAULT NOW()
-);
+-- 初始化提币限额
+INSERT INTO withdrawal_limits (level, level_name, btc_daily, eth_daily, min_deposit) VALUES
+(0, '普通用户', '2.00000000',   '50.00000000',   '0.00000000'),
+(1, '白银用户', '10.00000000',  '200.00000000',  '1.00000000'),
+(2, '黄金用户', '50.00000000',  '1000.00000000', '10.00000000'),
+(3, '钻石用户', '200.00000000', '5000.00000000', '50.00000000')
+ON CONFLICT (level) DO NOTHING;

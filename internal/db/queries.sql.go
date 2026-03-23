@@ -101,6 +101,32 @@ func (q *Queries) CreateDepositAddress(ctx context.Context, arg CreateDepositAdd
 	return err
 }
 
+const createPasswordResetToken = `-- name: CreatePasswordResetToken :one
+INSERT INTO password_reset_tokens (user_id, token, expires_at)
+VALUES ($1, $2, $3)
+RETURNING id, user_id, token, expires_at, used, created_at
+`
+
+type CreatePasswordResetTokenParams struct {
+	UserID    int64     `db:"user_id" json:"user_id"`
+	Token     string    `db:"token" json:"token"`
+	ExpiresAt time.Time `db:"expires_at" json:"expires_at"`
+}
+
+func (q *Queries) CreatePasswordResetToken(ctx context.Context, arg CreatePasswordResetTokenParams) (PasswordResetToken, error) {
+	row := q.db.QueryRowContext(ctx, createPasswordResetToken, arg.UserID, arg.Token, arg.ExpiresAt)
+	var i PasswordResetToken
+	err := row.Scan(
+		&i.ID,
+		&i.UserID,
+		&i.Token,
+		&i.ExpiresAt,
+		&i.Used,
+		&i.CreatedAt,
+	)
+	return i, err
+}
+
 const createRefreshToken = `-- name: CreateRefreshToken :one
 INSERT INTO refresh_tokens (user_id, token, expires_at)
 VALUES ($1, $2, $3)
@@ -262,6 +288,26 @@ func (q *Queries) GetLast24hWithdrawalByUserAndChain(ctx context.Context, arg Ge
 	var total interface{}
 	err := row.Scan(&total)
 	return total, err
+}
+
+const getPasswordResetToken = `-- name: GetPasswordResetToken :one
+SELECT id, user_id, token, expires_at, used, created_at FROM password_reset_tokens
+WHERE token = $1 AND used = FALSE AND expires_at > NOW()
+LIMIT 1
+`
+
+func (q *Queries) GetPasswordResetToken(ctx context.Context, token string) (PasswordResetToken, error) {
+	row := q.db.QueryRowContext(ctx, getPasswordResetToken, token)
+	var i PasswordResetToken
+	err := row.Scan(
+		&i.ID,
+		&i.UserID,
+		&i.Token,
+		&i.ExpiresAt,
+		&i.Used,
+		&i.CreatedAt,
+	)
+	return i, err
 }
 
 const getRefreshToken = `-- name: GetRefreshToken :one
@@ -870,6 +916,15 @@ func (q *Queries) ListWithdrawalsByUserID(ctx context.Context, userID string) ([
 	return items, nil
 }
 
+const markPasswordResetTokenUsed = `-- name: MarkPasswordResetTokenUsed :exec
+UPDATE password_reset_tokens SET used = TRUE WHERE token = $1
+`
+
+func (q *Queries) MarkPasswordResetTokenUsed(ctx context.Context, token string) error {
+	_, err := q.db.ExecContext(ctx, markPasswordResetTokenUsed, token)
+	return err
+}
+
 const removeRoleFromUser = `-- name: RemoveRoleFromUser :exec
 DELETE FROM user_roles WHERE user_id = $1 AND role_id = $2
 `
@@ -939,6 +994,20 @@ type UpdateUserLevelParams struct {
 
 func (q *Queries) UpdateUserLevel(ctx context.Context, arg UpdateUserLevelParams) error {
 	_, err := q.db.ExecContext(ctx, updateUserLevel, arg.Level, arg.ID)
+	return err
+}
+
+const updateUserPassword = `-- name: UpdateUserPassword :exec
+UPDATE users SET password = $1, updated_at = NOW() WHERE id = $2
+`
+
+type UpdateUserPasswordParams struct {
+	Password string `db:"password" json:"password"`
+	ID       int64  `db:"id" json:"id"`
+}
+
+func (q *Queries) UpdateUserPassword(ctx context.Context, arg UpdateUserPasswordParams) error {
+	_, err := q.db.ExecContext(ctx, updateUserPassword, arg.Password, arg.ID)
 	return err
 }
 

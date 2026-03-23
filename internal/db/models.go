@@ -43,6 +43,15 @@ type DepositAddress struct {
 	CreatedAt sql.NullTime `db:"created_at" json:"created_at"`
 }
 
+type PasswordResetToken struct {
+	ID        int64        `db:"id" json:"id"`
+	UserID    int64        `db:"user_id" json:"user_id"`
+	Token     string       `db:"token" json:"token"`
+	ExpiresAt time.Time    `db:"expires_at" json:"expires_at"`
+	Used      bool         `db:"used" json:"used"`
+	CreatedAt sql.NullTime `db:"created_at" json:"created_at"`
+}
+
 type Permission struct {
 	ID          int64        `db:"id" json:"id"`
 	Name        string       `db:"name" json:"name"`

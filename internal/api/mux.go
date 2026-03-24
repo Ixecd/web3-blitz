@@ -14,6 +14,10 @@ func NewMux(h *Handler, jwtSecret string, queries *db.Queries) *http.ServeMux {
 
 	// 公开接口
 	mux.Handle("/metrics", promhttp.Handler())
+	mux.HandleFunc("/healthz", func(w http.ResponseWriter, r *http.Request) {
+		w.WriteHeader(http.StatusOK)
+		w.Write([]byte("ok"))
+	})
 	mux.HandleFunc("/api/v1/register", h.Register)
 	mux.HandleFunc("/api/v1/login", h.Login)
 	mux.HandleFunc("/api/v1/address", h.GenerateAddress)

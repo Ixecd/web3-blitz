@@ -7,12 +7,6 @@
 
 ## 🔴 P0 — 核心功能联调
 
-### K8s 部署（下次第一件事）
-- [ ] `values.yaml` `walletService.env` 加 `DATABASE_URL`，重新 `dtk deploy`
-- [ ] 验证 wallet-service pod 正常启动，迁移自动执行
-- [ ] 查 `web3-blitz` pod 重启原因
-- [ ] wallet-service 环境变量改用 K8s Secret（DATABASE_URL、JWT_SECRET、SMTP_PASS 不应明文写在 values.yaml）
-
 ### 充值流程
 - [ ] Deposit 页面接真实 API
 - [ ] 生成 BTC / ETH 充值地址展示
@@ -31,6 +25,7 @@
 ### 工程修复
 - [ ] etcd 旧 registry 数据清理
 - [ ] `handler.go` 拆分：auth、wallet、admin 各自独立文件
+- [ ] wallet-service 环境变量改用 K8s Secret（DATABASE_URL、JWT_SECRET、SMTP_PASS）
 
 ---
 
@@ -48,7 +43,7 @@
 
 ### K8s
 - [ ] SMTP 配置注入（SMTP_HOST / SMTP_USER / SMTP_PASS / SMTP_FROM）
-- [ ] etcd 部署到 K8s
+- [ ] etcd 部署到 K8s（当前 emptyDir，重启数据丢失）
 
 ---
 
@@ -84,7 +79,14 @@
 - [x] 记住我（localStorage / sessionStorage 切换）
 - [x] golang-migrate + embed.FS（迁移文件打进二进制，启动自动执行）
 - [x] server.go → mux.go 改名
-- [x] K8s postgres（Bitnami）部署完成
+- [x] 自包含 Helm chart（postgres StatefulSet + etcd Deployment + 业务服务，零外部依赖）
+- [x] initContainers 启动顺序（wait-postgres + wait-etcd）
+- [x] K8s 全链路部署跑通（5 个 pod 全部 Running，零重启）
+- [x] /healthz 路由（dtk 状态机 VALIDATING 验证需要）
+- [x] wallet-service-deployment.yaml probe 改为 /healthz
+- [x] CI 修复（golang-migrate 替换 psql schema.sql，search_path=public）
+- [x] .gitignore 加 data/（etcd 本地数据目录）
+- [x] pgx v5 search_path 问题修复（DSN 加 &search_path=public）
 
 ---
 

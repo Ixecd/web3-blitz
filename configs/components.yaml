@@ -1,11 +1,19 @@
+# 由 dtk ai-plan 自动生成
+# LLM 分析依据：wallet-service 是核心业务服务，处理充提币逻辑，需高可用故 replicas 设为 2，CPU 和内存根据中等业务负载配置。chain-miner 仅为监控和指标收集工具，不对外服务，image 为空，资源配置较低。pos-sim 仅为模拟计算工具，未包含在配置中。基础设施如 bitcoind 和 geth-rpc 未列入。
+
 components:
-  # - name: web3-blitz
-  #   port: 8080
-  #   image: web3-blitz
   - name: wallet-service
     port: 2113
     image: wallet-service
+    replicas: 2
+    cpu: 200m
+    memory: 256Mi
+    storage: 0
 
-  - name: web3-blitz-controller
+  - name: chain-miner
     port: 0
-    image: ""    # ← 留空，跳过 build/push，镜像已手动推送
+    image: 
+    replicas: 1
+    cpu: 100m
+    memory: 128Mi
+    storage: 0

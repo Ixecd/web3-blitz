@@ -3,6 +3,7 @@
 
 components:
   - name: wallet-service
+    type: deployment
     port: 2113
     image: wallet-service
     replicas: 2
@@ -11,8 +12,9 @@ components:
     storage: 0
 
   - name: chain-miner
+    type: deployment
     port: 0
-    image: 
+    image:
     replicas: 1
     cpu: 100m
     memory: 128Mi

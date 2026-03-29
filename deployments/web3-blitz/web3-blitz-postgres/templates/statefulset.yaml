@@ -1,0 +1,53 @@
+apiVersion: apps/v1
+kind: StatefulSet
+metadata:
+  name: web3-blitz-postgres
+  namespace: {{ .Release.Namespace }}
+  labels:
+    app: web3-blitz-postgres
+spec:
+  serviceName: web3-blitz-postgres
+  replicas: 1
+  selector:
+    matchLabels:
+      app: web3-blitz-postgres
+  template:
+    metadata:
+      labels:
+        app: web3-blitz-postgres
+    spec:
+      containers:
+        - name: postgres
+          image: postgres:16-alpine
+          ports:
+            - containerPort: 5432
+          env:
+            - name: POSTGRES_USER
+              value: blitz
+            - name: POSTGRES_PASSWORD
+              value: blitz
+            - name: POSTGRES_DB
+              value: blitz
+            - name: PGDATA
+              value: /var/lib/postgresql/data/pgdata
+          readinessProbe:
+            exec:
+              command: ["pg_isready", "-U", "blitz", "-d", "blitz"]
+            initialDelaySeconds: 5
+            periodSeconds: 5
+          livenessProbe:
+            exec:
+              command: ["pg_isready", "-U", "blitz", "-d", "blitz"]
+            initialDelaySeconds: 15
+            periodSeconds: 10
+          volumeMounts:
+            - name: postgres-data
+              mountPath: /var/lib/postgresql/data
+  volumeClaimTemplates:
+    - metadata:
+        name: postgres-data
+      spec:
+        accessModes: ["ReadWriteOnce"]
+        resources:
+          requests:
+            storage: {{ .Values.storage }}

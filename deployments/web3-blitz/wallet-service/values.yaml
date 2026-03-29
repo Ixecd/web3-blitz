@@ -16,6 +16,6 @@ resources:
 
 env:
   - name: DATABASE_URL
-    value: "postgres://blitz:blitz@postgres:5432/blitz?sslmode=disable&search_path=public"
+    value: "postgres://blitz:blitz@web3-blitz-postgres:5432/blitz?sslmode=disable&search_path=public"
   - name: ETCD_ENDPOINTS
-    value: "etcd:2379"
+    value: "web3-blitz-etcd:2379"

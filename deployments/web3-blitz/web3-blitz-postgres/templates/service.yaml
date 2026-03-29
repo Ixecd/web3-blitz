@@ -1,0 +1,11 @@
+apiVersion: v1
+kind: Service
+metadata:
+  name: web3-blitz-postgres
+  namespace: {{ .Release.Namespace }}
+spec:
+  selector:
+    app: web3-blitz-postgres
+  ports:
+    - port: 5432
+      targetPort: 5432

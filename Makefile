@@ -18,6 +18,7 @@ ROOT_PACKAGE := github.com/Ixecd/web3-blitz
 VERSION_PACKAGE := github.com/Ixecd/component-base/pkg/version
 
 ROOT_DIR := $(shell pwd)
+BINS ?= wallet-service
 VERSION ?= v0.1.0
 ARCH ?= amd64
 REGISTRY_PREFIX ?= local

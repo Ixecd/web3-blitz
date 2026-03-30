@@ -1,0 +1,12 @@
+enabled: true
+
+image:
+  repository: qingchun22/dev-toolkit-controller
+  tag: v1.0.0
+  pullPolicy: Always
+
+global:
+  projectName: web3-blitz
+
+controller:
+  etcdEndpoints: "etcd:2379"

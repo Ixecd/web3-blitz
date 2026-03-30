@@ -2,13 +2,13 @@ resources:
   - kind: Deployment
     name: wallet-service
     namespace: web3-blitz
-    on_missing: recreate
+    on-missing: auto-heal
     max_retry: 3
     fallback: rollback
 
   - kind: StatefulSet
     name: postgres
     namespace: web3-blitz
-    on_missing: alert
+    on-missing: alert
     max_retry: 0
     fallback: ""

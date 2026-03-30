@@ -32,3 +32,10 @@ components:
     cpu: 100m
     memory: 128Mi
     storage: 0
+
+  - name: web3-blitz-controller
+    type: deployment
+    port: 0
+    image: ""
+    depends_on:
+      - web3-blitz-etcd

@@ -1,0 +1,40 @@
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: dev-toolkit-controller
+  namespace: {{ .Release.Namespace }}
+  labels:
+    app: dev-toolkit-controller
+spec:
+  replicas: 1
+  selector:
+    matchLabels:
+      app: dev-toolkit-controller
+  template:
+    metadata:
+      labels:
+        app: dev-toolkit-controller
+    spec:
+      serviceAccountName: dev-toolkit-controller
+      containers:
+        - name: controller
+          image: "{{ .Values.image.repository }}:{{ .Values.image.tag }}"
+          imagePullPolicy: {{ .Values.image.pullPolicy }}
+          command: ["dtk", "controller", "start"]
+          env:
+            - name: PROJECT_NAME
+              value: {{ .Values.global.projectName | quote }}
+            - name: KUBE_NAMESPACE
+              value: {{ .Release.Namespace | quote }}
+            - name: ETCD_ENDPOINTS
+              value: {{ .Values.controller.etcdEndpoints | quote }}
+            - name: RESOURCES_CONFIG
+              value: "/app/configs/resources.yaml"
+          volumeMounts:
+            - name: resources-config
+              mountPath: /app/configs
+              readOnly: true
+      volumes:
+        - name: resources-config
+          configMap:
+            name: web3-blitz-resources-config

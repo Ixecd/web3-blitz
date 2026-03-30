@@ -54,9 +54,15 @@ deploy.build:
 .PHONY: deploy.push
 deploy.push:
 	@$(foreach img,$(IMAGES), \
-		docker push $(REGISTRY_PREFIX)/$(img)-$(ARCH):$(VERSION); \
+		if docker image inspect $(REGISTRY_PREFIX)/$(img)-$(ARCH):$(VERSION) > /dev/null 2>&1; then \
+			echo "===========> Pushing $(img):$(VERSION)"; \
+			docker push $(REGISTRY_PREFIX)/$(img)-$(ARCH):$(VERSION) \
+			|| { echo "✘ docker push failed"; exit 1; }; \
+		else \
+			echo "===========> Skipping push $(img):$(VERSION) (not built locally, already on registry)"; \
+		fi; \
 	)
-
+	
 .PHONY: deploy.run
 deploy.run: $(addprefix deploy.run., $(DEPLOYS))
 

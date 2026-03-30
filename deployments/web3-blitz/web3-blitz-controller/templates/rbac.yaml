@@ -10,21 +10,22 @@ metadata:
   name: dev-toolkit-controller
   namespace: {{ .Release.Namespace }}
 rules:
+  # helm rollback 需要读写 release history（存在 secrets 里）
   - apiGroups: [""]
-    resources: ["*"]
-    verbs: ["*"]
+    resources: ["secrets"]
+    verbs: ["get", "list", "watch", "create", "update", "delete"]
+  # 检测资源是否存在
   - apiGroups: ["apps"]
-    resources: ["*"]
-    verbs: ["*"]
-  - apiGroups: ["rbac.authorization.k8s.io"]
-    resources: ["*"]
-    verbs: ["*"]
-  - apiGroups: ["batch"]
-    resources: ["*"]
-    verbs: ["*"]
-  - apiGroups: ["networking.k8s.io"]
-    resources: ["*"]
-    verbs: ["*"]
+    resources: ["deployments", "statefulsets", "replicasets"]
+    verbs: ["get", "list", "watch", "patch", "update"]
+  # pod 状态检查
+  - apiGroups: [""]
+    resources: ["pods"]
+    verbs: ["get", "list", "watch"]
+  # service/configmap 回滚时可能涉及
+  - apiGroups: [""]
+    resources: ["services", "configmaps", "persistentvolumeclaims"]
+    verbs: ["get", "list", "watch"]
 ---
 apiVersion: rbac.authorization.k8s.io/v1
 kind: RoleBinding

@@ -10,7 +10,7 @@ fi
 
 kubectl create secret generic wallet-service-secret \
   -n "$NAMESPACE" \
-  --from-literal=DATABASE_URL="$DATABASE_URL" \
+  --from-literal=DATABASE_URL="postgres://blitz:blitz@web3-blitz-postgres:5432/blitz?sslmode=disable&search_path=public" \
   --from-literal=WALLET_HD_SEED="$WALLET_HD_SEED" \
   --from-literal=SMTP_PASS="$SMTP_PASS" \
   --from-literal=JWT_SECRET="${JWT_SECRET:-$(openssl rand -hex 32)}" \

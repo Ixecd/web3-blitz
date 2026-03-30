@@ -1,7 +1,7 @@
 # TODO — web3-blitz 路线图
 
 > 充提币系统，从开发环境走向可交付。
-> 按优先级排列，持续更新。
+> 按优先级排列，持续更新。当前：v0.1.11
 
 ---
 
@@ -22,11 +22,6 @@
 - [ ] 接真实数据：余额、最近充值、最近提币
 - [ ] 数据定时刷新
 
-### 工程修复
-- [ ] etcd 旧 registry 数据清理
-- [ ] `handler.go` 拆分：auth、wallet、admin 各自独立文件
-- [ ] wallet-service 环境变量改用 K8s Secret（DATABASE_URL、JWT_SECRET、SMTP_PASS）
-
 ---
 
 ## 🟡 P1 — 完善
@@ -42,8 +37,7 @@
 - [ ] 升级用户等级联调验证
 
 ### K8s
-- [ ] SMTP 配置注入（SMTP_HOST / SMTP_USER / SMTP_PASS / SMTP_FROM）
-- [ ] etcd 部署到 K8s（当前 emptyDir，重启数据丢失）
+- [ ] etcd 旧 registry 数据清理
 
 ---
 
@@ -51,17 +45,30 @@
 
 - [ ] 扫码登录
 - [ ] 所有页面跨主题验收
-- [ ] Layout 侧边栏适配所有主题
 - [ ] 提币审核流程（pending → 人工审核 → 广播）
 - [ ] 充值地址二维码生成
 - [ ] 交易记录导出 CSV
 - [ ] 管理后台操作日志
 - [ ] 多币种扩展（USDT、TRX 等）
-- [ ] 用 dtk 部署 web3-blitz 到本地 K8s，跑通完整流程，作为 dtk 的 demo
+- [ ] Prometheus + Grafana 监控配置
+- [ ] 用 dtk 部署 web3-blitz 到本地 K8s，作为 dtk 推广 demo
 
 ---
 
 ## ✅ 已完成
+
+### v0.1.11 — K8s 工程化
+
+- [x] `internal/api/handler.go` 拆分为 auth.go / wallet.go / admin.go
+- [x] etcd 从 Deployment + emptyDir 迁移到 StatefulSet + PVC（数据持久化）
+- [x] 敏感环境变量迁移到 K8s Secret（DATABASE_URL / WALLET_HD_SEED / SMTP_PASS / JWT_SECRET）
+- [x] 非敏感配置保留在 values.yaml env 块
+- [x] `scripts/create-secret.sh` 幂等创建/更新 secret
+- [x] SMTP 注入 K8s 验证，忘记密码全链路在 K8s 跑通 ✅
+- [x] web3-blitz controller chart 迁移到独立 chart
+- [x] controller 自愈 e2e 验证（wallet-service 删除后 ~13s 恢复）
+
+### v0.1.10 及之前
 
 - [x] HD 钱包生成（BTC + ETH）
 - [x] 充值地址生成 + 注册表恢复
@@ -78,18 +85,13 @@
 - [x] 注册新账号（Login 页内联切换）
 - [x] 记住我（localStorage / sessionStorage 切换）
 - [x] golang-migrate + embed.FS（迁移文件打进二进制，启动自动执行）
-- [x] server.go → mux.go 改名
-- [x] 自包含 Helm chart（postgres StatefulSet + etcd Deployment + 业务服务，零外部依赖）
+- [x] 自包含 Helm chart（零外部依赖）
 - [x] initContainers 启动顺序（wait-postgres + wait-etcd）
-- [x] K8s 全链路部署跑通（5 个 pod 全部 Running，零重启）
-- [x] /healthz 路由（dtk 状态机 VALIDATING 验证需要）
-- [x] wallet-service-deployment.yaml probe 改为 /healthz
-- [x] CI 修复（golang-migrate 替换 psql schema.sql，search_path=public）
-- [x] .gitignore 加 data/（etcd 本地数据目录）
-- [x] pgx v5 search_path 问题修复（DSN 加 &search_path=public）
+- [x] K8s 全链路部署跑通（5 个 pod 全部 Running）
+- [x] /healthz 路由
+- [x] pgx v5 search_path 问题修复
 
 ---
 
-> 两个项目的交汇点：web3-blitz 跑通之后就是 dtk 最好的推广 demo，部署过程中发现的问题直接反哺 DTK P0/P1。
-
+> 两个项目的交汇点：web3-blitz 跑通之后就是 dtk 最好的推广 demo。
 > 每完成一项，移到 ✅ 已完成，并更新 SNAPSHOT。

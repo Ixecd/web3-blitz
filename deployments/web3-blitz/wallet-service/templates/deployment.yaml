@@ -33,10 +33,30 @@ spec:
             - name: http
               containerPort: {{ .Values.service.port }}
               protocol: TCP
-          {{- with .Values.env }}
           env:
+            - name: DATABASE_URL
+              valueFrom:
+                secretKeyRef:
+                  name: wallet-service-secret
+                  key: DATABASE_URL
+            - name: WALLET_HD_SEED
+              valueFrom:
+                secretKeyRef:
+                  name: wallet-service-secret
+                  key: WALLET_HD_SEED
+            - name: SMTP_PASS
+              valueFrom:
+                secretKeyRef:
+                  name: wallet-service-secret
+                  key: SMTP_PASS
+            - name: JWT_SECRET
+              valueFrom:
+                secretKeyRef:
+                  name: wallet-service-secret
+                  key: JWT_SECRET
+            {{- with .Values.env }}
             {{- toYaml . | nindent 12 }}
-          {{- end }}
+            {{- end }}
           livenessProbe:
             httpGet:
               path: /healthz

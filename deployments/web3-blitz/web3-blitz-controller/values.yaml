@@ -1,8 +1,8 @@
 enabled: true
 
 image:
-  repository: qingchun22/dev-toolkit-controller
-  tag: v1.0.0
+  repository: qingchun22/kubepivot-controller
+  tag: v1.5.2
   pullPolicy: Always
 
 global:

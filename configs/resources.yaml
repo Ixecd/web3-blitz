@@ -4,6 +4,7 @@ resources:
     namespace: web3-blitz
     on-missing: auto-heal
     max_retry: 3
+    force-sync: true
     fallback: rollback
 
   - kind: StatefulSet

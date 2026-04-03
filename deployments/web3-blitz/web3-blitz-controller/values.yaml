@@ -2,7 +2,7 @@ enabled: true
 
 image:
   repository: qingchun22/kubepivot-controller
-  tag: v1.5.2
+  tag: v1.7.0-dev
   pullPolicy: Always
 
 global:

@@ -1,0 +1,147 @@
+{
+  "exported": "2026-04-03T06:56:28+08:00",
+  "history": [
+    {
+      "from": "DEPLOYING",
+      "to": "IDLE",
+      "reason": "[force] resume: 服务不存在，重置状态",
+      "version": "v0.1.12",
+      "timestamp": "2026-03-31T14:53:05.364666+08:00"
+    },
+    {
+      "from": "IDLE",
+      "to": "INITIALIZING",
+      "reason": "开始部署 v0.1.12",
+      "version": "v0.1.12",
+      "timestamp": "2026-03-31T14:53:05.365118+08:00"
+    },
+    {
+      "from": "INITIALIZING",
+      "to": "DEPLOYING",
+      "reason": "执行 helm upgrade",
+      "version": "v0.1.12",
+      "timestamp": "2026-03-31T14:53:05.365224+08:00"
+    },
+    {
+      "from": "DEPLOYING",
+      "to": "IDLE",
+      "reason": "[force] resume: 服务不存在，重置状态",
+      "version": "v0.1.12",
+      "timestamp": "2026-03-31T14:53:46.168551+08:00"
+    },
+    {
+      "from": "IDLE",
+      "to": "INITIALIZING",
+      "reason": "开始部署 v0.1.12",
+      "version": "v0.1.12",
+      "timestamp": "2026-03-31T14:53:46.168812+08:00"
+    },
+    {
+      "from": "INITIALIZING",
+      "to": "DEPLOYING",
+      "reason": "执行 helm upgrade",
+      "version": "v0.1.12",
+      "timestamp": "2026-03-31T14:53:46.168909+08:00"
+    },
+    {
+      "from": "DEPLOYING",
+      "to": "VALIDATING",
+      "reason": "验证部署结果",
+      "version": "v0.1.12",
+      "timestamp": "2026-03-31T14:54:03.457245+08:00"
+    },
+    {
+      "from": "VALIDATING",
+      "to": "RUNNING",
+      "reason": "部署验证通过",
+      "version": "v0.1.12",
+      "timestamp": "2026-03-31T14:54:03.457427+08:00"
+    },
+    {
+      "from": "RUNNING",
+      "to": "INITIALIZING",
+      "reason": "开始部署 v0.1.12",
+      "version": "v0.1.12",
+      "timestamp": "2026-03-31T15:39:59.061913+08:00"
+    },
+    {
+      "from": "INITIALIZING",
+      "to": "DEPLOYING",
+      "reason": "执行 helm upgrade",
+      "version": "v0.1.12",
+      "timestamp": "2026-03-31T15:39:59.062476+08:00"
+    },
+    {
+      "from": "DEPLOYING",
+      "to": "ROLLING_BACK",
+      "reason": "整组回滚",
+      "version": "v0.1.12",
+      "timestamp": "2026-03-31T15:43:49.218508+08:00"
+    },
+    {
+      "from": "ROLLING_BACK",
+      "to": "RUNNING",
+      "reason": "整组回滚成功",
+      "version": "v0.1.12",
+      "timestamp": "2026-03-31T15:43:49.734837+08:00"
+    },
+    {
+      "from": "RUNNING",
+      "to": "INITIALIZING",
+      "reason": "开始部署 v0.1.12",
+      "version": "v0.1.12",
+      "timestamp": "2026-04-03T04:50:34.165637+08:00"
+    },
+    {
+      "from": "INITIALIZING",
+      "to": "DEPLOYING",
+      "reason": "执行 helm upgrade",
+      "version": "v0.1.12",
+      "timestamp": "2026-04-03T04:50:34.166174+08:00"
+    },
+    {
+      "from": "DEPLOYING",
+      "to": "VALIDATING",
+      "reason": "验证部署结果",
+      "version": "v0.1.12",
+      "timestamp": "2026-04-03T04:56:28.967743+08:00"
+    },
+    {
+      "from": "VALIDATING",
+      "to": "RUNNING",
+      "reason": "部署验证通过",
+      "version": "v0.1.12",
+      "timestamp": "2026-04-03T04:56:28.971201+08:00"
+    },
+    {
+      "from": "RUNNING",
+      "to": "INITIALIZING",
+      "reason": "开始部署 v0.1.12",
+      "version": "v0.1.12",
+      "timestamp": "2026-04-03T06:01:29.484021+08:00"
+    },
+    {
+      "from": "INITIALIZING",
+      "to": "DEPLOYING",
+      "reason": "执行 helm upgrade",
+      "version": "v0.1.12",
+      "timestamp": "2026-04-03T06:01:29.484611+08:00"
+    },
+    {
+      "from": "DEPLOYING",
+      "to": "VALIDATING",
+      "reason": "验证部署结果",
+      "version": "v0.1.12",
+      "timestamp": "2026-04-03T06:01:41.475382+08:00"
+    },
+    {
+      "from": "VALIDATING",
+      "to": "RUNNING",
+      "reason": "部署验证通过",
+      "version": "v0.1.12",
+      "timestamp": "2026-04-03T06:01:41.475626+08:00"
+    }
+  ],
+  "namespace": "web3-blitz",
+  "project": "web3-blitz"
+}

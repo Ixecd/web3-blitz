@@ -44,6 +44,10 @@ func (e ErrorCode) Message() string {
 		return "Duplicate withdrawal request"
 	case ErrWalletBroadcastFailed:
 		return "Transaction broadcast failed"
+	case ErrWalletPendingReview:
+		return "Withdrawal submitted, pending admin review"
+	case ErrWalletInvalidStatus:
+		return "Invalid withdrawal status for this operation"
 	default:
 		return "Unknown error"
 	}
@@ -52,7 +56,7 @@ func (e ErrorCode) Message() string {
 func (e ErrorCode) HTTPStatus() int {
 	switch e {
 	case ErrInvalidArg, ErrWalletChainNotSupported, ErrWalletAddressInvalid,
-		ErrWalletInsufficientBalance, ErrWalletDailyLimitExceeded:
+		ErrWalletInsufficientBalance, ErrWalletDailyLimitExceeded, ErrWalletInvalidStatus:
 		return 400
 	case ErrUnauthorized, ErrUserPasswordWrong, ErrUserTokenInvalid, ErrUserRefreshTokenInvalid:
 		return 401
@@ -60,6 +64,8 @@ func (e ErrorCode) HTTPStatus() int {
 		return 403
 	case ErrNotFound, ErrUserNotFound:
 		return 404
+	case ErrWalletPendingReview:
+		return 202
 	case ErrDeadlineExceeded:
 		return 408
 	case ErrUserAlreadyExists:

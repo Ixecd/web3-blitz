@@ -120,4 +120,86 @@ CI/Git  kp secret seal → SealedSecret
 
 ---
 
+
+## 八、架构债务清偿 — 迁移剥离 + 链上对账（新增 ✅）
+
+### 8.1 数据库迁移从主服务剥离 ✅
+- **问题**: `runMigrations()` 绑在主二进制 `NewDB()`，多副本启动时并发迁移有脏状态风险
+- **修复**:
+  - `internal/db/connect.go` 增加 `SKIP_MIGRATIONS` 守卫，主服务 Deployment 设 `SKIP_MIGRATIONS=true`
+  - `cmd/migrate` 独立二进制，纯 `golang-migrate/migrate/v4`，不依赖任何 Blitz internal 包
+  - Helm `pre-upgrade,pre-install` hook Job，迁移在主服务启动前完成
+  - 向后兼容：未设 `SKIP_MIGRATIONS` 时 `make dev` 行为不变
+
+### 8.2 链上充值对账 CronJob ✅
+- **问题**: BTC/ETH deposit watcher 只向前扫块，重启间隙、死信、链重组可能导致漏账，无反向校验
+- **修复**:
+  - `internal/wallet/reconcile/reconciler.go`: 逐块扫链 vs DB 记录，三类发现 — missing（链上有 DB 无）、phantom（DB 有链上无）、amount_mismatch
+  - `cmd/reconcile` 独立二进制，4 分钟超时，可选 PushGateway 推送
+  - Helm CronJob 每 5 分钟执行，`concurrencyPolicy: Forbid` 防重叠
+  - Prometheus 指标：`blitz_reconcile_missing_deposits_total` / `blitz_reconcile_phantom_deposits_total` / `blitz_reconcile_amount_mismatch_total` / `blitz_reconcile_errors_total` / `blitz_reconcile_duration_seconds`
+
+### 8.3 构建与部署 ✅
+- `build/docker/migrate/Dockerfile` — alpine 基镜像，builder 编译 `cmd/migrate`，SQL 文件复制到 `/migrations`
+- `build/docker/reconcile/Dockerfile` — alpine 基镜像，builder 编译 `cmd/reconcile`
+- `deployments/blitz/reconcile-cronjob/` — 独立 Helm 子 chart
+- 主镜像 `build/docker/blitz/Dockerfile` 已移除 `COPY migrations`，镜像体积更小 & 攻击面缩减
+
+## 九、提币人工审核闸门（新增 ✅）
+
+### 9.1 问题
+- Withdraw handler 验证通过后直接广播交易，无人工审核环节
+- 攻击者绕过量额校验或内部人恶意操作 → 热钱包被提空
+- 这是上线前的硬前置条件
+
+### 9.2 修复
+- `WITHDRAWAL_AUTO_APPROVE` 环境变量 — 默认关闭（人工审核），设为 `true` 恢复老行为
+- 默认模式: Withdraw → CreateWithdrawal(pending) → 返回 `pending_review` → 管理员审核 → approve/reject
+- 三个管理员端点: `GET /api/v1/admin/withdrawals/pending` / `POST approve` / `POST reject`
+- `withdraw:review` RBAC 权限保护，审计日志 `withdraw.approved` / `withdraw.rejected` 全留痕
+- `broadcastWithdrawal()` 复用 auto-approve 和审核通过两种路径
+- SQL: `ListPendingWithdrawals` + `AdminApproveRejectWithdrawal`
+- 错误码: `ErrWalletPendingReview` (202) / `ErrWalletInvalidStatus` (400)
+
+### 9.3 状态流转
+```
+pending (用户提交)
+├── admin approve → broadcasting → completed (广播成功)
+│                                 └── failed (广播失败，DB 仍可重审)
+└── admin reject  → rejected
+```
+
+## 十、热→冷钱包定时归集（新增 ✅）
+
+### 10.1 问题
+- `ETH_HOT_WALLET_KEY` 泄露 → 热钱包所有资金可被提空
+- 热钱包长期累积用户充值，暴露窗口随金额和时间无限放大
+- 没有自动减损机制
+
+### 10.2 修复
+- `internal/wallet/sweep/sweeper.go`: 每次归集扫描热钱包余额，扣除 keep 阈值后全量转入冷地址
+- **BTC 归集**: `GetBalance("*")` 获取钱包总余额 → `balance - keep - feeBuffer` → `SendToAddress` 广播
+- **ETH 归集**: `BalanceAt` 获取余额 → `balance - keep - gasCost` → EIP-155 签名 → `SendTransaction` 广播
+- `cmd/sweep` 独立二进制，2 分钟超时，可选 PushGateway 推送
+- Helm CronJob 每 15 分钟执行，`concurrencyPolicy: Forbid` 防重叠
+- 冷钱包地址通过 `COLD_WALLET_BTC` / `COLD_WALLET_ETH` env 注入（K8s Secret）
+- 保留金额可配置: `HOT_WALLET_KEEP_BTC` (默认 0.01), `HOT_WALLET_KEEP_ETH` (默认 0.1)
+- BTC 手续费缓冲: `SWEEP_BTC_FEE_BUFFER` (默认 0.0001)
+
+### 10.3 减损模型
+```
+热钱包风险敞口 = max(keepThreshold, 15 分钟内新增充值)
+归集频率 15 分钟 → 最大损失窗口 < 15 分钟的充值流入
+冷钱包私钥离线 → 即使热密钥泄露，攻击者最多拿走 keep + 最近 15 分钟充值
+```
+
+### 10.4 指标与审计
+- `blitz_sweep_btc_total{result}` — success / skipped / error
+- `blitz_sweep_eth_total{result}` — success / skipped / error
+- `blitz_sweep_amount_total{chain}` — 累计归集金额
+- `sweep.executed` / `sweep.failed` 审计日志
+
+---
 *全部修完，FORGET 清空。*
+
+

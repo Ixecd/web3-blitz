@@ -31,6 +31,13 @@ rbac:
 db:
   user: "user"
   sslmode: "disable"  # 生产环境建议 require
+migrate:
+  enabled: true
+  backoffLimit: 3
+  image:
+    repository: qingchun22/blitz-migrate-arm64
+    pullPolicy: Always
+
 env:
   - name: ETCD_ENDPOINTS
     value: "blitz-etcd:2379"

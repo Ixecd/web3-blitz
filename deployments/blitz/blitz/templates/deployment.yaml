@@ -66,8 +66,8 @@ spec:
               value: {{ .Values.db.sslmode | quote }}
             - name: ETCD_ENDPOINTS
               value: blitz-etcd:2379
-            - name: MIGRATIONS_PATH
-              value: /migrations
+            - name: SKIP_MIGRATIONS
+              value: "true"
             - name: JWT_SECRET
               valueFrom:
                 secretKeyRef:

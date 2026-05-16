@@ -7,6 +7,7 @@ import (
 	"fmt"
 	"log/slog"
 	"net/http"
+	"os"
 
 	"github.com/Ixecd/blitz/internal/audit"
 	"github.com/Ixecd/blitz/internal/auth"
@@ -319,57 +320,46 @@ func (h *Handler) Withdraw(w http.ResponseWriter, r *http.Request) {
 	audit.WithdrawSubmitted(userID, string(req.Chain),
 		fmt.Sprintf("%.8f", req.Amount), req.ToAddress)
 
-	// 广播交易
-	var txID string
-	var fee float64
-	var broadcastErr error
-
-	switch req.Chain {
-	case types.ChainBTC:
-		res, err := h.btcWallet.Withdraw(ctx, req.ToAddress, req.Amount)
-		txID, fee, broadcastErr = res.TxID, res.Fee, err
-	case types.ChainETH:
-		res, err := h.ethWallet.Withdraw(ctx, req.ToAddress, req.Amount)
-		txID, fee, broadcastErr = res.TxID, res.Fee, err
-	default:
-		Fail(w, code.ErrWalletChainNotSupported)
+	// 是否自动广播（WITHDRAWAL_AUTO_APPROVE=true 时保持老行为）
+	if os.Getenv("WITHDRAWAL_AUTO_APPROVE") == "true" {
+		txID, fee, broadcastErr := h.broadcastWithdrawal(ctx, record.ID, req.Chain, req.ToAddress, req.Amount)
+		status := "completed"
+		if broadcastErr != nil {
+			status = "failed"
+			slog.Error("提币广播失败", "id", record.ID, "err", broadcastErr)
+			metrics.WithdrawTotal.WithLabelValues(string(req.Chain), "failed").Inc()
+			audit.WithdrawFailed(userID, string(req.Chain),
+				fmt.Sprintf("%.8f", req.Amount), broadcastErr.Error())
+		} else {
+			metrics.WithdrawTotal.WithLabelValues(string(req.Chain), "completed").Inc()
+			metrics.WithdrawAmount.WithLabelValues(string(req.Chain)).Add(req.Amount)
+			audit.WithdrawCompleted(userID, string(req.Chain),
+				fmt.Sprintf("%.8f", req.Amount), txID)
+		}
+		OK(w, map[string]interface{}{
+			"id":         record.ID,
+			"tx_id":      txID,
+			"user_id":    userID,
+			"to_address": req.ToAddress,
+			"amount":     req.Amount,
+			"fee":        fee,
+			"status":     status,
+			"chain":      req.Chain,
+		})
 		return
 	}
 
-	// 更新 DB 状态
-	status := "completed"
-	if broadcastErr != nil {
-		status = "failed"
-		slog.Error("提币广播失败", "id", record.ID, "err", broadcastErr)
-	}
-
-	_ = h.queries.UpdateWithdrawalTx(ctx, db.UpdateWithdrawalTxParams{
-		TxID:   sql.NullString{String: txID, Valid: txID != ""},
-		Fee:    fmt.Sprintf("%.8f", fee),
-		Status: status,
-		ID:     record.ID,
-	})
-
-	if broadcastErr != nil {
-		metrics.WithdrawTotal.WithLabelValues(string(req.Chain), "failed").Inc()
-		audit.WithdrawFailed(userID, string(req.Chain),
-			fmt.Sprintf("%.8f", req.Amount), broadcastErr.Error())
-	} else {
-		metrics.WithdrawTotal.WithLabelValues(string(req.Chain), "completed").Inc()
-		metrics.WithdrawAmount.WithLabelValues(string(req.Chain)).Add(req.Amount)
-		audit.WithdrawCompleted(userID, string(req.Chain),
-			fmt.Sprintf("%.8f", req.Amount), txID)
-	}
-
+	// 人工审核模式：只写 pending，不广播
+	slog.Info("提币已提交，等待管理员审核", "id", record.ID, "user_id", userID,
+		"chain", req.Chain, "amount", fmt.Sprintf("%.8f", req.Amount))
 	OK(w, map[string]interface{}{
 		"id":         record.ID,
-		"tx_id":      txID,
 		"user_id":    userID,
 		"to_address": req.ToAddress,
 		"amount":     req.Amount,
-		"fee":        fee,
-		"status":     status,
+		"status":     "pending_review",
 		"chain":      req.Chain,
+		"note":       "提币请求已提交，等待管理员审核。",
 	})
 }
 
@@ -423,4 +413,234 @@ func (h *Handler) ListWithdrawals(w http.ResponseWriter, r *http.Request) {
 	}
 
 	OK(w, resp)
+}
+
+// broadcastWithdrawal 执行链上广播并更新 DB 状态。
+// 供 auto-approve 模式和人工审核通过后复用。
+func (h *Handler) broadcastWithdrawal(ctx context.Context, withdrawalID int64, chain types.Chain, toAddress string, amount float64) (txID string, fee float64, err error) {
+	switch chain {
+	case types.ChainBTC:
+		res, e := h.btcWallet.Withdraw(ctx, toAddress, amount)
+		if e != nil {
+			_ = h.queries.AdminApproveRejectWithdrawal(ctx, db.AdminApproveRejectWithdrawalParams{
+				TxID:   sql.NullString{},
+				Fee:    "0.00000000",
+				Status: "failed",
+				ID:     withdrawalID,
+			})
+			return res.TxID, res.Fee, e
+		}
+		txID, fee = res.TxID, res.Fee
+	case types.ChainETH:
+		res, e := h.ethWallet.Withdraw(ctx, toAddress, amount)
+		if e != nil {
+			_ = h.queries.AdminApproveRejectWithdrawal(ctx, db.AdminApproveRejectWithdrawalParams{
+				TxID:   sql.NullString{},
+				Fee:    "0.00000000",
+				Status: "failed",
+				ID:     withdrawalID,
+			})
+			return res.TxID, res.Fee, e
+		}
+		txID, fee = res.TxID, res.Fee
+	default:
+		return "", 0, fmt.Errorf("unsupported chain: %s", chain)
+	}
+
+	return txID, fee, nil
+}
+
+// ListPendingWithdrawals 管理员查看所有待审核提币（需要 withdraw:review 权限）
+func (h *Handler) ListPendingWithdrawals(w http.ResponseWriter, r *http.Request) {
+	if r.Method != http.MethodGet {
+		Fail(w, code.ErrInvalidArg)
+		return
+	}
+
+	withdrawals, err := h.queries.ListPendingWithdrawals(r.Context())
+	if err != nil {
+		FailInternal(w, err)
+		return
+	}
+
+	type PendingResp struct {
+		ID        int64  `json:"id"`
+		Address   string `json:"address"`
+		UserID    string `json:"user_id"`
+		Amount    string `json:"amount"`
+		Status    string `json:"status"`
+		Chain     string `json:"chain"`
+		CreatedAt string `json:"created_at"`
+	}
+
+	resp := make([]PendingResp, 0, len(withdrawals))
+	for _, wl := range withdrawals {
+		resp = append(resp, PendingResp{
+			ID:        wl.ID,
+			Address:   wl.Address,
+			UserID:    wl.UserID,
+			Amount:    wl.Amount,
+			Status:    wl.Status,
+			Chain:     wl.Chain,
+			CreatedAt: wl.CreatedAt.Time.Format("2006-01-02 15:04:05"),
+		})
+	}
+
+	OK(w, resp)
+}
+
+// ApproveWithdrawal 管理员审核通过提币，执行链上广播（需要 withdraw:review 权限）
+func (h *Handler) ApproveWithdrawal(w http.ResponseWriter, r *http.Request) {
+	if r.Method != http.MethodPost {
+		Fail(w, code.ErrInvalidArg)
+		return
+	}
+
+	var req struct {
+		ID int64 `json:"id"`
+	}
+	if err := json.NewDecoder(r.Body).Decode(&req); err != nil {
+		Fail(w, code.ErrInvalidArg)
+		return
+	}
+	if req.ID <= 0 {
+		FailMsg(w, code.ErrInvalidArg, "id 必须为正整数")
+		return
+	}
+
+	ctx := r.Context()
+	claims := auth.GetClaims(r)
+	if claims == nil {
+		Fail(w, code.ErrUnauthorized)
+		return
+	}
+	adminID := fmt.Sprintf("%d", claims.UserID)
+
+	// 从 DB 加载 pending 记录确认状态
+	pendings, err := h.queries.ListPendingWithdrawals(ctx)
+	if err != nil {
+		FailInternal(w, err)
+		return
+	}
+
+	var wl db.Withdrawal
+	found := false
+	for _, p := range pendings {
+		if p.ID == req.ID {
+			wl = p
+			found = true
+			break
+		}
+	}
+	if !found {
+		FailMsg(w, code.ErrWalletInvalidStatus, "该提币记录不存在或已处理")
+		return
+	}
+
+	var amountFloat float64
+	fmt.Sscanf(wl.Amount, "%f", &amountFloat)
+
+	chain := types.Chain(wl.Chain)
+	txID, fee, broadcastErr := h.broadcastWithdrawal(ctx, wl.ID, chain, wl.Address, amountFloat)
+
+	if broadcastErr != nil {
+		slog.Error("审核通过后广播失败", "id", wl.ID, "err", broadcastErr)
+		metrics.WithdrawTotal.WithLabelValues(wl.Chain, "failed").Inc()
+		audit.WithdrawFailed(wl.UserID, wl.Chain, wl.Amount, broadcastErr.Error())
+		Fail(w, code.ErrWalletBroadcastFailed)
+		return
+	}
+
+	_ = h.queries.AdminApproveRejectWithdrawal(ctx, db.AdminApproveRejectWithdrawalParams{
+		TxID:   sql.NullString{String: txID, Valid: true},
+		Fee:    fmt.Sprintf("%.8f", fee),
+		Status: "completed",
+		ID:     wl.ID,
+	})
+
+	metrics.WithdrawTotal.WithLabelValues(wl.Chain, "completed").Inc()
+	metrics.WithdrawAmount.WithLabelValues(wl.Chain).Add(amountFloat)
+	audit.WithdrawApproved(wl.UserID, wl.Chain, wl.Amount, txID, adminID)
+
+	slog.Info("提币审核通过并已广播", "id", wl.ID, "admin", adminID, "tx_id", txID,
+		"chain", wl.Chain, "amount", wl.Amount)
+
+	OK(w, map[string]interface{}{
+		"id":      wl.ID,
+		"tx_id":   txID,
+		"status":  "completed",
+		"message": "提币审核通过，已广播。",
+	})
+}
+
+// RejectWithdrawal 管理员拒绝提币（需要 withdraw:review 权限）
+func (h *Handler) RejectWithdrawal(w http.ResponseWriter, r *http.Request) {
+	if r.Method != http.MethodPost {
+		Fail(w, code.ErrInvalidArg)
+		return
+	}
+
+	var req struct {
+		ID     int64  `json:"id"`
+		Reason string `json:"reason"`
+	}
+	if err := json.NewDecoder(r.Body).Decode(&req); err != nil {
+		Fail(w, code.ErrInvalidArg)
+		return
+	}
+	if req.ID <= 0 {
+		FailMsg(w, code.ErrInvalidArg, "id 必须为正整数")
+		return
+	}
+	if req.Reason == "" {
+		req.Reason = "管理员拒绝"
+	}
+
+	ctx := r.Context()
+	claims := auth.GetClaims(r)
+	if claims == nil {
+		Fail(w, code.ErrUnauthorized)
+		return
+	}
+	adminID := fmt.Sprintf("%d", claims.UserID)
+
+	pendings, err := h.queries.ListPendingWithdrawals(ctx)
+	if err != nil {
+		FailInternal(w, err)
+		return
+	}
+
+	var wl db.Withdrawal
+	found := false
+	for _, p := range pendings {
+		if p.ID == req.ID {
+			wl = p
+			found = true
+			break
+		}
+	}
+	if !found {
+		FailMsg(w, code.ErrWalletInvalidStatus, "该提币记录不存在或已处理")
+		return
+	}
+
+	_ = h.queries.AdminApproveRejectWithdrawal(ctx, db.AdminApproveRejectWithdrawalParams{
+		TxID:   sql.NullString{},
+		Fee:    "0.00000000",
+		Status: "rejected",
+		ID:     wl.ID,
+	})
+
+	metrics.WithdrawTotal.WithLabelValues(wl.Chain, "rejected").Inc()
+	audit.WithdrawRejected(wl.UserID, wl.Chain, wl.Amount, adminID, req.Reason)
+
+	slog.Warn("提币已被管理员拒绝", "id", wl.ID, "admin", adminID,
+		"chain", wl.Chain, "amount", wl.Amount, "reason", req.Reason)
+
+	OK(w, map[string]interface{}{
+		"id":      wl.ID,
+		"status":  "rejected",
+		"reason":  req.Reason,
+		"message": "提币已拒绝。",
+	})
 }

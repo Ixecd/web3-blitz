@@ -26,8 +26,10 @@ func NewDB() (*sql.DB, error) {
 		return nil, fmt.Errorf("ping db: %w", err)
 	}
 
-	if err := runMigrations(database); err != nil {
-		return nil, fmt.Errorf("migrate db: %w", err)
+	if os.Getenv("SKIP_MIGRATIONS") != "true" {
+		if err := runMigrations(database); err != nil {
+			return nil, fmt.Errorf("migrate db: %w", err)
+		}
 	}
 
 	slog.Info("数据库已连接")

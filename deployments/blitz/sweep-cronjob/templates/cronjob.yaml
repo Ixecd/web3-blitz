@@ -1,0 +1,50 @@
+apiVersion: batch/v1
+kind: CronJob
+metadata:
+  name: {{ .Release.Name }}-sweep
+  namespace: {{ .Release.Namespace }}
+  labels:
+    app: blitz-sweep
+    kubepivot.io/name: {{ .Chart.Name }}
+    kubepivot.io/instance: {{ .Release.Name }}
+spec:
+  schedule: {{ .Values.schedule | quote }}
+  concurrencyPolicy: {{ .Values.concurrencyPolicy }}
+  failedJobsHistoryLimit: 3
+  successfulJobsHistoryLimit: 1
+  jobTemplate:
+    spec:
+      backoffLimit: {{ .Values.backoffLimit }}
+      ttlSecondsAfterFinished: {{ .Values.ttlSecondsAfterFinished }}
+      template:
+        spec:
+          restartPolicy: Never
+          serviceAccountName: {{ .Release.Name }}-sweep
+          containers:
+            - name: sweep
+              image: "{{ .Values.image.repository }}:{{ .Values.image.tag | default .Chart.AppVersion }}"
+              imagePullPolicy: {{ .Values.image.pullPolicy }}
+              env:
+                - name: BTC_RPC_HOST
+                  value: {{ .Values.env.BTC_RPC_HOST | quote }}
+                - name: ETH_RPC_HOST
+                  value: {{ .Values.env.ETH_RPC_HOST | quote }}
+                - name: BTC_NETWORK
+                  value: {{ .Values.env.BTC_NETWORK | quote }}
+                - name: COLD_WALLET_BTC
+                  value: {{ .Values.env.COLD_WALLET_BTC | quote }}
+                - name: COLD_WALLET_ETH
+                  value: {{ .Values.env.COLD_WALLET_ETH | quote }}
+                - name: HOT_WALLET_KEEP_BTC
+                  value: {{ .Values.env.HOT_WALLET_KEEP_BTC | quote }}
+                - name: HOT_WALLET_KEEP_ETH
+                  value: {{ .Values.env.HOT_WALLET_KEEP_ETH | quote }}
+                - name: SWEEP_BTC_FEE_BUFFER
+                  value: {{ .Values.env.SWEEP_BTC_FEE_BUFFER | quote }}
+                - name: ETH_HOT_WALLET_KEY
+                  valueFrom:
+                    secretKeyRef:
+                      name: blitz-secret
+                      key: ETH_HOT_WALLET_KEY
+              resources:
+                {{- toYaml .Values.resources | nindent 16 }}

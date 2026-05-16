@@ -51,6 +51,13 @@ func NewMux(h *Handler, jwtSecret string, queries *db.Queries) *http.ServeMux {
 		auth.RBACMiddleware(queries, "limit:read", h.ListWithdrawalLimits)))
 	mux.HandleFunc("/api/v1/withdrawal-limits/update", auth.JWTMiddleware(jwtSecret,
 		auth.RBACMiddleware(queries, "limit:write", h.UpdateWithdrawalLimit)))
+	// 管理员提币审核
+	mux.HandleFunc("/api/v1/admin/withdrawals/pending", auth.JWTMiddleware(jwtSecret,
+		auth.RBACMiddleware(queries, "withdraw:review", RateLimitMiddleware(h.generalRL, h.ListPendingWithdrawals))))
+	mux.HandleFunc("/api/v1/admin/withdrawals/approve", auth.JWTMiddleware(jwtSecret,
+		auth.RBACMiddleware(queries, "withdraw:review", RateLimitMiddleware(h.generalRL, h.ApproveWithdrawal))))
+	mux.HandleFunc("/api/v1/admin/withdrawals/reject", auth.JWTMiddleware(jwtSecret,
+		auth.RBACMiddleware(queries, "withdraw:review", RateLimitMiddleware(h.generalRL, h.RejectWithdrawal))))
 
 	return mux
 }

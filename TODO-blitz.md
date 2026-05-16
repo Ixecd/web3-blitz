@@ -57,7 +57,35 @@
 
 ## ✅ 已完成
 
-### v0.1.11 — K8s 工程化
+### v0.1.12 — 迁移剥离 + 链上对账
+
+- [x] Migration Job（pre-upgrade hook）：`cmd/migrate` 独立二进制，`SKIP_MIGRATIONS` 守卫，Helm hook Job
+- [x] Reconciliation CronJob：`cmd/reconcile` 对账入口，每 5 分钟扫 BTC/ETH 链上 vs DB，报告 missing/phantom/amount_mismatch
+- [x] `queries.sql` 新增 `ListDepositAddressesByChain` + `ListDepositsByChainAndHeightRange`
+- [x] Prometheus 对账指标 5 个：`blitz_reconcile_*`
+- [x] build/docker/migrate + build/docker/reconcile 双新 Dockerfile
+- [x] deploy reconcile-cronjob 子 chart（CronJob + ServiceAccount）
+
+### v0.1.14 — 热→冷钱包归集
+
+- [x] `internal/wallet/sweep/sweeper.go` — 定时扫热钱包余额，扣除 keep 阈值后全量转入冷钱包
+- [x] BTC: `GetBalance(*)` → `balance - keep - feeBuffer` → `SendToAddress` 归集
+- [x] ETH: `BalanceAt` → `balance - keep - gasCost` → 签名广播归集
+- [x] `cmd/sweep` 独立二进制，2 分钟超时，可选 PushGateway
+- [x] 3 个 Prometheus 指标: `blitz_sweep_btc_total` / `blitz_sweep_eth_total` / `blitz_sweep_amount_total`
+- [x] audit.go: `sweep.executed` / `sweep.failed` 审计事件
+- [x] `build/docker/sweep/Dockerfile` + `deploy/blitz/sweep-cronjob/` Helm CronJob（每 15 分钟）
+
+### v0.1.13 — 提币人工审核
+
+- [x] 提币 WITHDRAWAL_AUTO_APPROVE 开关 — 默认关闭，提币写 pending 后返回，不广播
+- [x] 管理员审核端点：GET /api/v1/admin/withdrawals/pending + POST approve / reject
+- [x] withdraw:review RBAC 权限保护审核端点
+- [x] audit.go: withdraw.approved / withdraw.rejected 审计事件
+- [x] broadcastWithdrawal 复用 — auto-approve 和审核通过共用同一广播逻辑
+- [x] 向后兼容：WITHDRAWAL_AUTO_APPROVE=true 恢复老行为
+
+### v0.1.12 — 迁移剥离 + 链上对账
 
 - [x] `internal/api/handler.go` 拆分为 auth.go / wallet.go / admin.go
 - [x] etcd 从 Deployment + emptyDir 迁移到 StatefulSet + PVC（数据持久化）

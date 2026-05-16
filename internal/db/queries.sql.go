@@ -12,6 +12,29 @@ import (
 	"time"
 )
 
+const adminApproveRejectWithdrawal = `-- name: AdminApproveRejectWithdrawal :exec
+UPDATE withdrawals
+SET tx_id = $1, fee = $2, status = $3, updated_at = NOW()
+WHERE id = $4
+`
+
+type AdminApproveRejectWithdrawalParams struct {
+	TxID   sql.NullString `db:"tx_id" json:"tx_id"`
+	Fee    string         `db:"fee" json:"fee"`
+	Status string         `db:"status" json:"status"`
+	ID     int64          `db:"id" json:"id"`
+}
+
+func (q *Queries) AdminApproveRejectWithdrawal(ctx context.Context, arg AdminApproveRejectWithdrawalParams) error {
+	_, err := q.db.ExecContext(ctx, adminApproveRejectWithdrawal,
+		arg.TxID,
+		arg.Fee,
+		arg.Status,
+		arg.ID,
+	)
+	return err
+}
+
 const assignRoleToUser = `-- name: AssignRoleToUser :exec
 INSERT INTO user_roles (user_id, role_id)
 VALUES ($1, $2)
@@ -648,12 +671,90 @@ func (q *Queries) ListAllDepositAddresses(ctx context.Context) ([]DepositAddress
 	return items, nil
 }
 
+const listDepositAddressesByChain = `-- name: ListDepositAddressesByChain :many
+SELECT id, user_id, address, chain, path, created_at FROM deposit_addresses WHERE chain = $1
+`
+
+func (q *Queries) ListDepositAddressesByChain(ctx context.Context, chain string) ([]DepositAddress, error) {
+	rows, err := q.db.QueryContext(ctx, listDepositAddressesByChain, chain)
+	if err != nil {
+		return nil, err
+	}
+	defer rows.Close()
+	var items []DepositAddress
+	for rows.Next() {
+		var i DepositAddress
+		if err := rows.Scan(
+			&i.ID,
+			&i.UserID,
+			&i.Address,
+			&i.Chain,
+			&i.Path,
+			&i.CreatedAt,
+		); err != nil {
+			return nil, err
+		}
+		items = append(items, i)
+	}
+	if err := rows.Close(); err != nil {
+		return nil, err
+	}
+	if err := rows.Err(); err != nil {
+		return nil, err
+	}
+	return items, nil
+}
+
 const listDepositsByChain = `-- name: ListDepositsByChain :many
 SELECT id, tx_id, address, user_id, amount, height, confirmed, chain, created_at, updated_at FROM deposits WHERE chain = $1 ORDER BY created_at DESC
 `
 
 func (q *Queries) ListDepositsByChain(ctx context.Context, chain string) ([]Deposit, error) {
 	rows, err := q.db.QueryContext(ctx, listDepositsByChain, chain)
+	if err != nil {
+		return nil, err
+	}
+	defer rows.Close()
+	var items []Deposit
+	for rows.Next() {
+		var i Deposit
+		if err := rows.Scan(
+			&i.ID,
+			&i.TxID,
+			&i.Address,
+			&i.UserID,
+			&i.Amount,
+			&i.Height,
+			&i.Confirmed,
+			&i.Chain,
+			&i.CreatedAt,
+			&i.UpdatedAt,
+		); err != nil {
+			return nil, err
+		}
+		items = append(items, i)
+	}
+	if err := rows.Close(); err != nil {
+		return nil, err
+	}
+	if err := rows.Err(); err != nil {
+		return nil, err
+	}
+	return items, nil
+}
+
+const listDepositsByChainAndHeightRange = `-- name: ListDepositsByChainAndHeightRange :many
+SELECT id, tx_id, address, user_id, amount, height, confirmed, chain, created_at, updated_at FROM deposits WHERE chain = $1 AND height >= $2 AND height <= $3 ORDER BY height ASC
+`
+
+type ListDepositsByChainAndHeightRangeParams struct {
+	Chain     string `db:"chain" json:"chain"`
+	MinHeight int64  `db:"min_height" json:"min_height"`
+	MaxHeight int64  `db:"max_height" json:"max_height"`
+}
+
+func (q *Queries) ListDepositsByChainAndHeightRange(ctx context.Context, arg ListDepositsByChainAndHeightRangeParams) ([]Deposit, error) {
+	rows, err := q.db.QueryContext(ctx, listDepositsByChainAndHeightRange, arg.Chain, arg.MinHeight, arg.MaxHeight)
 	if err != nil {
 		return nil, err
 	}
@@ -707,6 +808,44 @@ func (q *Queries) ListDepositsByUserID(ctx context.Context, userID string) ([]De
 			&i.Amount,
 			&i.Height,
 			&i.Confirmed,
+			&i.Chain,
+			&i.CreatedAt,
+			&i.UpdatedAt,
+		); err != nil {
+			return nil, err
+		}
+		items = append(items, i)
+	}
+	if err := rows.Close(); err != nil {
+		return nil, err
+	}
+	if err := rows.Err(); err != nil {
+		return nil, err
+	}
+	return items, nil
+}
+
+const listPendingWithdrawals = `-- name: ListPendingWithdrawals :many
+SELECT id, tx_id, address, user_id, amount, fee, status, chain, created_at, updated_at FROM withdrawals WHERE status = 'pending' ORDER BY created_at ASC
+`
+
+func (q *Queries) ListPendingWithdrawals(ctx context.Context) ([]Withdrawal, error) {
+	rows, err := q.db.QueryContext(ctx, listPendingWithdrawals)
+	if err != nil {
+		return nil, err
+	}
+	defer rows.Close()
+	var items []Withdrawal
+	for rows.Next() {
+		var i Withdrawal
+		if err := rows.Scan(
+			&i.ID,
+			&i.TxID,
+			&i.Address,
+			&i.UserID,
+			&i.Amount,
+			&i.Fee,
+			&i.Status,
 			&i.Chain,
 			&i.CreatedAt,
 			&i.UpdatedAt,

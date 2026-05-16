@@ -42,6 +42,48 @@ var (
 		Name: "blitz_lock_acquire_fail_total",
 		Help: "Total number of distributed lock acquire failures",
 	}, []string{"key"})
+
+	// 对账
+	ReconcileMissingDeposits = prometheus.NewCounterVec(prometheus.CounterOpts{
+		Name: "blitz_reconcile_missing_deposits_total",
+		Help: "Total number of deposits found on-chain but missing in DB",
+	}, []string{"chain"})
+
+	ReconcilePhantomDeposits = prometheus.NewCounterVec(prometheus.CounterOpts{
+		Name: "blitz_reconcile_phantom_deposits_total",
+		Help: "Total number of deposits in DB but not found on-chain",
+	}, []string{"chain"})
+
+	ReconcileAmountMismatch = prometheus.NewCounterVec(prometheus.CounterOpts{
+		Name: "blitz_reconcile_amount_mismatch_total",
+		Help: "Total number of deposits with amount mismatch between chain and DB",
+	}, []string{"chain"})
+
+	ReconcileErrorsTotal = prometheus.NewCounterVec(prometheus.CounterOpts{
+		Name: "blitz_reconcile_errors_total",
+		Help: "Total number of reconciliation errors",
+	}, []string{"chain", "type"})
+
+	ReconcileDuration = prometheus.NewGaugeVec(prometheus.GaugeOpts{
+		Name: "blitz_reconcile_duration_seconds",
+		Help: "Duration of the last reconciliation run in seconds",
+	}, []string{"chain"})
+
+	// 热→冷归集
+	SweepBTCTotal = prometheus.NewCounterVec(prometheus.CounterOpts{
+		Name: "blitz_sweep_btc_total",
+		Help: "Total number of BTC hot-to-cold sweeps",
+	}, []string{"result"}) // success / skipped / error
+
+	SweepETHTTotal = prometheus.NewCounterVec(prometheus.CounterOpts{
+		Name: "blitz_sweep_eth_total",
+		Help: "Total number of ETH hot-to-cold sweeps",
+	}, []string{"result"})
+
+	SweepAmountTotal = prometheus.NewCounterVec(prometheus.CounterOpts{
+		Name: "blitz_sweep_amount_total",
+		Help: "Total amount swept to cold wallet",
+	}, []string{"chain"})
 )
 
 func Init() {
@@ -53,5 +95,13 @@ func Init() {
 		DeadLetterTotal,
 		ReorgTotal,
 		LockAcquireFailTotal,
+		ReconcileMissingDeposits,
+		ReconcilePhantomDeposits,
+		ReconcileAmountMismatch,
+		ReconcileErrorsTotal,
+		ReconcileDuration,
+		SweepBTCTotal,
+		SweepETHTTotal,
+		SweepAmountTotal,
 	)
 }

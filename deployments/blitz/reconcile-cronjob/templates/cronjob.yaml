@@ -1,0 +1,48 @@
+apiVersion: batch/v1
+kind: CronJob
+metadata:
+  name: {{ .Release.Name }}-reconcile
+  namespace: {{ .Release.Namespace }}
+  labels:
+    app: blitz-reconcile
+    kubepivot.io/name: {{ .Chart.Name }}
+    kubepivot.io/instance: {{ .Release.Name }}
+spec:
+  schedule: {{ .Values.schedule | quote }}
+  concurrencyPolicy: {{ .Values.concurrencyPolicy }}
+  failedJobsHistoryLimit: 3
+  successfulJobsHistoryLimit: 1
+  jobTemplate:
+    spec:
+      backoffLimit: {{ .Values.backoffLimit }}
+      ttlSecondsAfterFinished: {{ .Values.ttlSecondsAfterFinished }}
+      template:
+        spec:
+          restartPolicy: Never
+          serviceAccountName: {{ .Release.Name }}-reconcile
+          initContainers:
+            - name: wait-postgres
+              image: busybox:1.35
+              command: ['sh', '-c', 'until nc -z blitz-postgres 5432; do sleep 2; done']
+          containers:
+            - name: reconcile
+              image: "{{ .Values.image.repository }}:{{ .Values.image.tag | default .Chart.AppVersion }}"
+              imagePullPolicy: {{ .Values.image.pullPolicy }}
+              env:
+                - name: DATABASE_URL
+                  valueFrom:
+                    secretKeyRef:
+                      name: blitz-secret
+                      key: DATABASE_URL
+                - name: BTC_RPC_HOST
+                  value: {{ .Values.env.BTC_RPC_HOST | quote }}
+                - name: ETH_RPC_HOST
+                  value: {{ .Values.env.ETH_RPC_HOST | quote }}
+                - name: BTC_NETWORK
+                  value: {{ .Values.env.BTC_NETWORK | quote }}
+                - name: RECONCILE_BLOCK_DEPTH_BTC
+                  value: {{ .Values.env.RECONCILE_BLOCK_DEPTH_BTC | quote }}
+                - name: RECONCILE_BLOCK_DEPTH_ETH
+                  value: {{ .Values.env.RECONCILE_BLOCK_DEPTH_ETH | quote }}
+              resources:
+                {{- toYaml .Values.resources | nindent 16 }}

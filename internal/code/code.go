@@ -30,4 +30,6 @@ const (
 	ErrWalletDailyLimitExceeded                          // ErrWalletDailyLimitExceeded - 400: Daily withdrawal limit exceeded.
 	ErrWalletDuplicateWithdraw                           // ErrWalletDuplicateWithdraw - 429: Duplicate withdrawal request.
 	ErrWalletBroadcastFailed                             // ErrWalletBroadcastFailed - 500: Transaction broadcast failed.
+	ErrWalletPendingReview                               // ErrWalletPendingReview - 202: Withdrawal submitted, pending admin review.
+	ErrWalletInvalidStatus                               // ErrWalletInvalidStatus - 400: Invalid withdrawal status for this operation.
 )

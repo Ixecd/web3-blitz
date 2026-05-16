@@ -87,6 +87,64 @@ func WithdrawFailed(userID, chain, amount, detail string) {
 	})
 }
 
+func WithdrawApproved(userID, chain, amount, txID, adminID string) {
+	if defaultLogger == nil {
+		return
+	}
+	defaultLogger.Log(Event{
+		Action:    "withdraw.approved",
+		UserID:    userID,
+		Chain:     chain,
+		Amount:    amount,
+		TxID:      txID,
+		Result:    "approved",
+		Detail:    "admin:" + adminID,
+	})
+}
+
+func WithdrawRejected(userID, chain, amount, adminID, reason string) {
+	if defaultLogger == nil {
+		return
+	}
+	defaultLogger.Log(Event{
+		Action: "withdraw.rejected",
+		UserID: userID,
+		Chain:  chain,
+		Amount: amount,
+		Result: "rejected",
+		Detail: "admin:" + adminID + " reason:" + reason,
+	})
+}
+
+func SweepExecuted(chain, amount, txID, coldAddr string) {
+	if defaultLogger == nil {
+		return
+	}
+	defaultLogger.Log(Event{
+		Action:    "sweep.executed",
+		UserID:    "system",
+		Chain:     chain,
+		Amount:    amount,
+		ToAddress: coldAddr,
+		TxID:      txID,
+		Result:    "success",
+	})
+}
+
+func SweepFailed(chain, amount, detail string) {
+	if defaultLogger == nil {
+		return
+	}
+	defaultLogger.Log(Event{
+		Action: "sweep.failed",
+		UserID: "system",
+		Chain:  chain,
+		Amount: amount,
+		Result: "failed",
+		Detail: detail,
+	})
+}
+
 func Close() {
 	if defaultLogger != nil {
 		defaultLogger.file.Close()

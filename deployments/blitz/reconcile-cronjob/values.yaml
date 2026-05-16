@@ -1,0 +1,24 @@
+schedule: "*/5 * * * *"
+concurrencyPolicy: Forbid
+backoffLimit: 2
+ttlSecondsAfterFinished: 300
+
+image:
+  repository: qingchun22/blitz-reconcile-arm64
+  pullPolicy: Always
+  tag: ""
+
+env:
+  BTC_RPC_HOST: "blitz-btc-node:18443/wallet/blitz_wallet"
+  ETH_RPC_HOST: "http://blitz-eth-node:8545"
+  BTC_NETWORK: "regtest"
+  RECONCILE_BLOCK_DEPTH_BTC: "200"
+  RECONCILE_BLOCK_DEPTH_ETH: "10000"
+
+resources:
+  requests:
+    cpu: 50m
+    memory: 64Mi
+  limits:
+    cpu: 200m
+    memory: 256Mi

@@ -50,6 +50,14 @@ INSERT INTO withdrawals (address, user_id, amount, fee, status, chain)
 VALUES (@address, @user_id, @amount, 0, 'pending', @chain)
 RETURNING *;
 
+-- name: ListPendingWithdrawals :many
+SELECT * FROM withdrawals WHERE status = 'pending' ORDER BY created_at ASC;
+
+-- name: AdminApproveRejectWithdrawal :exec
+UPDATE withdrawals
+SET tx_id = @tx_id, fee = @fee, status = @status, updated_at = NOW()
+WHERE id = @id;
+
 -- name: UpdateWithdrawalTx :exec
 UPDATE withdrawals
 SET tx_id = @tx_id, fee = @fee, status = @status, updated_at = NOW()
@@ -170,6 +178,12 @@ SELECT * FROM withdrawal_limits ORDER BY level ASC;
 UPDATE withdrawal_limits
 SET btc_daily = @btc_daily, eth_daily = @eth_daily
 WHERE level = @level;
+
+-- name: ListDepositAddressesByChain :many
+SELECT * FROM deposit_addresses WHERE chain = @chain;
+
+-- name: ListDepositsByChainAndHeightRange :many
+SELECT * FROM deposits WHERE chain = @chain AND height >= @min_height AND height <= @max_height ORDER BY height ASC;
 
 -- name: CreatePasswordResetToken :one
 INSERT INTO password_reset_tokens (user_id, token, expires_at)

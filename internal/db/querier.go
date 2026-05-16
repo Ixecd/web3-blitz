@@ -9,6 +9,7 @@ import (
 )
 
 type Querier interface {
+	AdminApproveRejectWithdrawal(ctx context.Context, arg AdminApproveRejectWithdrawalParams) error
 	AssignRoleToUser(ctx context.Context, arg AssignRoleToUserParams) error
 	CreateDeadLetter(ctx context.Context, arg CreateDeadLetterParams) error
 	CreateDeposit(ctx context.Context, arg CreateDepositParams) error
@@ -37,8 +38,11 @@ type Querier interface {
 	GetWithdrawalLimit(ctx context.Context, level int32) (WithdrawalLimit, error)
 	ListAddressesByUserID(ctx context.Context, userID string) ([]DepositAddress, error)
 	ListAllDepositAddresses(ctx context.Context) ([]DepositAddress, error)
+	ListDepositAddressesByChain(ctx context.Context, chain string) ([]DepositAddress, error)
 	ListDepositsByChain(ctx context.Context, chain string) ([]Deposit, error)
+	ListDepositsByChainAndHeightRange(ctx context.Context, arg ListDepositsByChainAndHeightRangeParams) ([]Deposit, error)
 	ListDepositsByUserID(ctx context.Context, userID string) ([]Deposit, error)
+	ListPendingWithdrawals(ctx context.Context) ([]Withdrawal, error)
 	ListUnconfirmedDeposits(ctx context.Context) ([]Deposit, error)
 	ListUnresolvedDeadLetters(ctx context.Context) ([]DeadLetter, error)
 	ListUsers(ctx context.Context) ([]ListUsersRow, error)

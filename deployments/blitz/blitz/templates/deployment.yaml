@@ -46,6 +46,11 @@ spec:
             capabilities:
               drop: ["ALL"]
           env:
+            - name: DATABASE_URL
+              valueFrom:
+                secretKeyRef:
+                  name: blitz-secret
+                  key: DATABASE_URL
             - name: DB_USER
               value: {{ .Values.db.user | quote }}
             - name: DB_PASSWORD
@@ -61,6 +66,22 @@ spec:
               value: {{ .Values.db.sslmode | quote }}
             - name: ETCD_ENDPOINTS
               value: blitz-etcd:2379
+            - name: MIGRATIONS_PATH
+              value: /migrations
+            - name: JWT_SECRET
+              valueFrom:
+                secretKeyRef:
+                  name: blitz-secret
+                  key: JWT_SECRET
+            - name: SEED_PASSPHRASE
+              valueFrom:
+                secretKeyRef:
+                  name: blitz-secret
+                  key: SEED_PASSPHRASE
+          volumeMounts:
+            - name: hd-seed
+              mountPath: /configs/secrets
+              readOnly: true
           livenessProbe:
             httpGet:
               path: /healthz
@@ -75,3 +96,8 @@ spec:
             periodSeconds: 5
           resources:
             {{- toYaml .Values.resources | nindent 12 }}
+      volumes:
+        - name: hd-seed
+          secret:
+            secretName: blitz-hd-seed
+            defaultMode: 0444

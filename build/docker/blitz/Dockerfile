@@ -11,7 +11,7 @@ RUN go mod download
 COPY . .
 RUN CGO_ENABLED=0 GOOS=$TARGETOS GOARCH=$TARGETARCH \
     go build -trimpath -ldflags '-s -w -extldflags "-static"' \
-    -o blitz ./cmd/blitz
+    -o blitz ./cmd/wallet-service
 
 # ====================== Runtime Stage ======================
 # scratch：零依赖零 OS 漏洞，适合纯静态 Go 二进制
@@ -27,6 +27,9 @@ LABEL org.opencontainers.image.source="https://github.com/Ixecd/KubePivot" \
 COPY --from=builder /etc/ssl/certs/ca-certificates.crt /etc/ssl/certs/
 
 COPY --from=builder /app/blitz /blitz
+
+# 数据库迁移文件
+COPY --from=builder /app/internal/db/migrations /migrations
 
 USER 65532:65532
 

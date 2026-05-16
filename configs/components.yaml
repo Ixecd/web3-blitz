@@ -6,7 +6,7 @@ components:
     cpu: 200m
     memory: 256Mi
     storage: 1Gi
-    deps: []
+    depends_on: []
 
   - name: blitz-etcd
     type: StatefulSet
@@ -14,7 +14,7 @@ components:
     cpu: 100m
     memory: 128Mi
     replicas: 1
-    deps: []
+    depends_on: []
 
   # 业务服务层
   - name: blitz
@@ -25,6 +25,6 @@ components:
     cpu: 100m
     memory: 128Mi
     strategy: rolling
-    deps:
+    depends_on:
       - blitz-postgres
       - blitz-etcd

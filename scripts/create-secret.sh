@@ -20,8 +20,10 @@ kubectl create secret generic blitz-secret \
   --from-literal=DATABASE_URL="${DATABASE_URL:-postgres://blitz:blitz@blitz-postgres:5432/blitz?sslmode=disable}" \
   --from-literal=JWT_SECRET="${JWT_SECRET:-$(openssl rand -hex 32)}" \
   --from-literal=APP_SECRET="${APP_SECRET:-$(openssl rand -hex 16)}" \
+  --from-literal=SEED_PASSPHRASE="${SEED_PASSPHRASE:-$(openssl rand -hex 16)}" \
   --save-config \
   --dry-run=client -o yaml | kubectl apply -f -
 
 echo "✅ blitz-secret 已创建/更新（namespace: $NAMESPACE）"
-echo "⚠️  生产环境请设置真实的 DATABASE_URL / JWT_SECRET / APP_SECRET"
+echo "⚠️  生产环境请设置真实的 DATABASE_URL / JWT_SECRET / APP_SECRET / SEED_PASSPHRASE"
+echo "⚠️  HD 种子文件还需另外创建: kubectl create secret generic blitz-hd-seed --from-file=hd-seed.enc=configs/secrets/hd-seed.enc"

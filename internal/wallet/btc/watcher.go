@@ -8,7 +8,6 @@ import (
 	"github.com/Ixecd/blitz/internal/config"
 	"github.com/Ixecd/blitz/internal/wallet/types"
 	"github.com/btcsuite/btcd/btcutil"
-	"github.com/btcsuite/btcd/chaincfg"
 )
 
 // DepositWatcher 监听BTC充值
@@ -100,7 +99,7 @@ func (w *DepositWatcher) processBlock(height int64) {
 			address := vout.ScriptPubKey.Address
 
 			// 验证地址格式
-			_, err := btcutil.DecodeAddress(address, &chaincfg.RegressionNetParams)
+			_, err := btcutil.DecodeAddress(address, NetParams())
 			if err != nil {
 				continue
 			}

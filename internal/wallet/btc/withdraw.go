@@ -6,7 +6,6 @@ import (
 	"log"
 
 	"github.com/btcsuite/btcd/btcutil"
-	"github.com/btcsuite/btcd/chaincfg"
 	"github.com/btcsuite/btcd/chaincfg/chainhash"
 )
 
@@ -17,7 +16,7 @@ type WithdrawResult struct {
 
 // Withdraw 通过 bitcoind 热钱包签名广播提币交易
 func (w *BTCWallet) Withdraw(ctx context.Context, toAddress string, amount float64) (WithdrawResult, error) {
-	addr, err := btcutil.DecodeAddress(toAddress, &chaincfg.RegressionNetParams)
+	addr, err := btcutil.DecodeAddress(toAddress, NetParams())
 	if err != nil {
 		return WithdrawResult{}, fmt.Errorf("BTC 地址解析失败: %w", err)
 	}

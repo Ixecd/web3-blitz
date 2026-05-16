@@ -10,7 +10,6 @@ import (
 	"github.com/Ixecd/blitz/internal/wallet/core"
 	"github.com/Ixecd/blitz/internal/wallet/types"
 	"github.com/btcsuite/btcd/btcutil"
-	"github.com/btcsuite/btcd/chaincfg"
 )
 
 type BTCWallet struct {
@@ -43,7 +42,7 @@ func (w *BTCWallet) GenerateDepositAddress(ctx context.Context, userID string, c
 	// 生成 bech32 地址（P2WPKH）
 	addr, err := btcutil.NewAddressWitnessPubKeyHash(
 		btcutil.Hash160(childKey.PublicKey().Key),
-		&chaincfg.RegressionNetParams,
+		NetParams(),
 	)
 	if err != nil {
 		return types.AddressResponse{}, err
@@ -81,7 +80,7 @@ func (w *BTCWallet) GenerateDepositAddress(ctx context.Context, userID string, c
 // GetBalance 真实查询 BTC 地址收到的金额（充值地址专用）
 func (w *BTCWallet) GetBalance(ctx context.Context, address string, chain types.Chain) (types.BalanceResponse, error) {
 	// 1. 把字符串地址解析成 btcutil.Address
-	addr, err := btcutil.DecodeAddress(address, &chaincfg.RegressionNetParams)
+	addr, err := btcutil.DecodeAddress(address, NetParams())
 	if err != nil {
 		return types.BalanceResponse{}, fmt.Errorf("地址解析失败 (regtest): %w", err)
 	}
